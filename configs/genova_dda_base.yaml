@@ -1,0 +1,30 @@
+hidden_size: 1024
+preprocessing:
+  max_charge: 10
+  max_subion_num: 20
+  d_ori_node: 10
+  d_ori_edge: 1
+  edge_type_num: 215
+  path_max_length: 100
+
+encoder:
+  d_relation: 512
+  num_layers: 12
+  node_encoder:
+    d_node: 64
+    expansion_factor: 32
+  edge_encoder:
+    d_edge: 64
+    expansion_factor: 8
+  relation:
+    ffn_hidden_size: 4096
+    num_heads: 32
+
+decoder:
+  dictlen: 23
+  max_seq_len: 50
+  num_heads: 8
+  num_layers: 3
+
+dataset:
+  use_path_label: False
