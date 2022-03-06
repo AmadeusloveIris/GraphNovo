@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/home/z37mao/Genova/train_encoder.py", line 197, in <module>
+    scaler.step(optimizer)
+  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/site-packages/torch/cuda/amp/grad_scaler.py", line 338, in step
+    retval = self._maybe_opt_step(optimizer, optimizer_state, *args, **kwargs)
+  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/site-packages/torch/cuda/amp/grad_scaler.py", line 284, in _maybe_opt_step
+    if not sum(v.item() for v in optimizer_state["found_inf_per_device"].values()):
+  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/site-packages/torch/cuda/amp/grad_scaler.py", line 284, in <genexpr>
+    if not sum(v.item() for v in optimizer_state["found_inf_per_device"].values()):
+KeyboardInterrupt

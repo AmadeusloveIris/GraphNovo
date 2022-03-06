@@ -15,6 +15,8 @@ from torch.cuda.amp import GradScaler as GradScaler
 import torch.nn as nn
 import torch.optim as optim
 
+import wandb
+
 cfg = OmegaConf.load('configs/genova_dda_light.yaml')
 spec_header = pd.read_csv('/data/z37mao/genova/pretrain_data_sparse/genova_psm.csv',index_col='index')
 spec_header = spec_header[np.logical_or(spec_header['Experiment Name']=='Cerebellum',spec_header['Experiment Name']=='HeLa')]
@@ -133,6 +135,9 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 local_rank = int(os.environ['LOCAL_RANK'])
 
+if local_rank==0:
+    wandb.init(project="Genova", entity="amadeusandiris")
+
 torch.cuda.set_device(local_rank)
 dist.init_process_group(backend='nccl')  # nccl是GPU设备上最快、最推荐的后端
 
@@ -145,15 +150,18 @@ dl = DataLoader(ds,batch_size=4,collate_fn=collate_fn,num_workers=4,shuffle=True
 model = genova.GenovaEncoder(cfg,bin_classification=True).to(local_rank)
 model = DDP(model, device_ids=[local_rank])
 loss_fn = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(),lr=2e-6)
+optimizer = optim.AdamW(model.parameters(),lr=2e-4)
 scaler = GradScaler()
 
-CHECKPOINT_PATH = '/data/z37mao/save/model_max.pt'
-checkpoint = torch.load(CHECKPOINT_PATH,map_location = {'cuda:%d' % 0: 'cuda:%d' % local_rank})['model_state_dict']
+CHECKPOINT_PATH = '/data/z37mao/genova/save/model_max.pt'
+#checkpoint = torch.load(CHECKPOINT_PATH,map_location = {'cuda:%d' % 0: 'cuda:%d' % local_rank})['model_state_dict']
+checkpoint = torch.load(CHECKPOINT_PATH,map_location = {'cuda:%d' % 0: 'cuda:%d' % local_rank})
 if list(model.state_dict().keys())[0].startswith('module'):
-    model.load_state_dict(checkpoint)
+    #model.load_state_dict(checkpoint)
+    model.load_state_dict(OrderedDict([('module.'+key, v) for key, v in checkpoint.items()]))
 else:
-    model.load_state_dict(OrderedDict([(key[7:], v) for key, v in checkpoint.items()]))
+    #model.load_state_dict(OrderedDict([(key[7:], v) for key, v in checkpoint.items()]))
+    model.load_state_dict(checkpoint)
 
 loss_detect = 0
 min_loss = 10000
@@ -175,16 +183,16 @@ for epoch in range(5):
             accuracy += (output==labels).sum()/labels.shape[0]
             recall += ((output==labels)[labels==1]).sum()/(labels==1).sum()
             precision += ((output==labels)[labels==1]).sum()/(output==1).sum()
-            loss_detect+=loss.item()
+            loss_detect += loss.item()
             if i%detect_period==0:
-                loss_ave = loss_detect/detect_period
-                print('loss:{}, accuracy:{}, recall:{}, precision:{}'.format(loss_ave, 
-                accuracy/detect_period, recall/detect_period, precision/detect_period))
-                if min_loss>loss_ave:
-                    min_loss = loss_ave
-                    torch.save({'model_state_dict':model.state_dict(),'optimizer_state_dict':optimizer.state_dict()},'/data/z37mao/save/model_max2.pt')
-                loss_detect = 0
-                accuracy, recall, precision = 0, 0, 0
+                wandb.log({"loss": loss_detect/detect_period, 
+                "accuracy": accuracy/detect_period, 
+                "recall": recall/detect_period, 
+                "precision": precision/detect_period}
+                )
+                torch.save({'model_state_dict':model.state_dict(),
+                'optimizer_state_dict':optimizer.state_dict()},'/data/z37mao/genova/save/model_max.pt')
+                loss_detect, accuracy, recall, precision = 0, 0, 0, 0
         scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()

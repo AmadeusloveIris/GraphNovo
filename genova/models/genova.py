@@ -11,7 +11,8 @@ class Genova(nn.Module):
         super().__init__()
         self.encoder = GenovaEncoder(cfg)
         self.decoder = GenovaDecoder(cfg)
-        self.output_ffn = nn.Sequential(nn.Linear(cfg.hidden_size,cfg.hidden_size),
+        self.output_ffn = nn.Sequential(nn.LayerNorm(cfg.hidden_size),
+                                        nn.Linear(cfg.hidden_size,cfg.hidden_size),
                                         nn.LayerNorm(cfg.hidden_size),
                                         nn.ReLU(inplace=True),
                                         nn.Linear(cfg.hidden_size,cfg.hidden_size),

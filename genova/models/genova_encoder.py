@@ -24,11 +24,13 @@ class GenovaEncoder(nn.Module):
         self.genova_encoder_layers = nn.ModuleList([GenovaEncoderLayer(hidden_size = cfg.hidden_size,
                                                                        ffn_hidden_size = cfg.encoder.relation.ffn_hidden_size,
                                                                        num_head = cfg.encoder.relation.num_heads,
-                                                                       d_relation = cfg.encoder.d_relation) for i in range(cfg.encoder.num_layers)])
+                                                                       d_relation = cfg.encoder.d_relation,
+                                                                       layer_num = cfg.encoder.num_layers)]*cfg.encoder.num_layers)
         
         self.bin_classification = bin_classification
         if self.bin_classification: 
-            self.output_ffn = nn.Sequential(nn.Linear(cfg.hidden_size,cfg.hidden_size),
+            self.output_ffn = nn.Sequential(nn.LayerNorm(cfg.hidden_size),
+                                            nn.Linear(cfg.hidden_size,cfg.hidden_size),
                                             nn.LayerNorm(cfg.hidden_size),
                                             nn.ReLU(inplace=True),
                                             nn.Linear(cfg.hidden_size,cfg.hidden_size),
@@ -43,9 +45,8 @@ class GenovaEncoder(nn.Module):
         node = self.node_encoder(**node_input)
         edge = self.edge_encoder(**edge_input)
         
-        last_relation = 0
         for genova_encoder_layer in self.genova_encoder_layers:
-            node, last_relation = genova_encoder_layer(node, edge, last_relation, **rel_input)
+            node = genova_encoder_layer(node, edge, **rel_input)
         
         if self.bin_classification:
             node = self.output_ffn(node)

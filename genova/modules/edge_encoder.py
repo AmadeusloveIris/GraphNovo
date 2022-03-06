@@ -65,12 +65,12 @@ class EdgeEncoder(nn.Module):
             edge_pos (torch.IntTensor): edge position in LP(Longest Path)
             dist (torch.IntTensor): length of LP
             rel_coor_cated (torch.IntTensor): coordinates of those data (Because we use Hybrid COO to store sparse tensor)
-            batch_num (int): [description]
-            max_node (int): [description]
+            batch_num (int): batch_num
+            max_node (int): max_node in batch of graph
             rel_mask (torch.BoolTensor): [description]
 
         Returns:
-            [type]: [description]
+            relation (Tensor): Bias of Attention Matrix in Transformer
         """
         rel_type = self.edge_type_embed(rel_type)
         edge_pos = self.edge_pos_embed(edge_pos)
