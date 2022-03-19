@@ -1,0 +1,79 @@
+Traceback (most recent call last):
+  File "/home/z37mao/Genova/genova/utils/genova_preprocess.py", line 309, in <module>
+    node_mass, node_input, rel_input, edge_input, graph_label = graph_gen(product_ions_moverz, product_ions_intensity, precursor_ion_mass, precursor_charge>2)
+  File "/home/z37mao/Genova/genova/utils/genova_preprocess.py", line 131, in __call__
+    rel_type, rel_error, dist, rel_pos, rel_coor = self.multihop_rel_generator(subedge_maxnum, edge_type, edge_error)
+  File "/home/z37mao/Genova/genova/utils/genova_preprocess.py", line 264, in multihop_rel_generator
+    rel_type, rel_error = gen_edge_input(n,
+  File "edge_matrix_gen.pyx", line 126, in edge_matrix_gen.gen_edge_input
+    path_matrix = np.zeros((node_num, node_num, max_dist, subedge_maxnum),dtype=np.int64)
+numpy.core._exceptions.MemoryError: Unable to allocate 474. GiB for an array with shape (2735, 2735, 63, 135) and data type int64
+Traceback (most recent call last):
+  File "/home/z37mao/Genova/genova/utils/genova_preprocess.py", line 309, in <module>
+    node_mass, node_input, rel_input, edge_input, graph_label = graph_gen(product_ions_moverz, product_ions_intensity, precursor_ion_mass, precursor_charge>2)
+  File "/home/z37mao/Genova/genova/utils/genova_preprocess.py", line 131, in __call__
+    rel_type, rel_error, dist, rel_pos, rel_coor = self.multihop_rel_generator(subedge_maxnum, edge_type, edge_error)
+  File "/home/z37mao/Genova/genova/utils/genova_preprocess.py", line 264, in multihop_rel_generator
+    rel_type, rel_error = gen_edge_input(n,
+  File "edge_matrix_gen.pyx", line 126, in edge_matrix_gen.gen_edge_input
+    path_matrix = np.zeros((node_num, node_num, max_dist, subedge_maxnum),dtype=np.int64)
+numpy.core._exceptions.MemoryError: Unable to allocate 239. GiB for an array with shape (2059, 2059, 56, 135) and data type int64
+Traceback (most recent call last):
+  File "/home/z37mao/Genova/genova/utils/genova_preprocess.py", line 317, in <module>
+    writer.write(compressed_data)
+OSError: [Errno 28] No space left on device
+
+During handling of the above exception, another exception occurred:
+
+OSError: [Errno 28] No space left on device
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/z37mao/Genova/genova/utils/genova_preprocess.py", line 317, in <module>
+    writer.write(compressed_data)
+OSError: [Errno 28] No space left on device
+Traceback (most recent call last):
+  File "/home/z37mao/Genova/genova/utils/genova_preprocess.py", line 317, in <module>
+    writer.write(compressed_data)
+OSError: [Errno 28] No space left on device
+
+During handling of the above exception, another exception occurred:
+
+OSError: [Errno 28] No space left on device
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/z37mao/Genova/genova/utils/genova_preprocess.py", line 317, in <module>
+    writer.write(compressed_data)
+OSError: [Errno 28] No space left on device
+Traceback (most recent call last):
+  File "/home/z37mao/Genova/genova/utils/genova_preprocess.py", line 317, in <module>
+    writer.write(compressed_data)
+OSError: [Errno 28] No space left on device
+
+During handling of the above exception, another exception occurred:
+
+OSError: [Errno 28] No space left on device
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/z37mao/Genova/genova/utils/genova_preprocess.py", line 317, in <module>
+    writer.write(compressed_data)
+OSError: [Errno 28] No space left on device
+Traceback (most recent call last):
+  File "/home/z37mao/Genova/genova/utils/genova_preprocess.py", line 317, in <module>
+    writer.write(compressed_data)
+OSError: [Errno 28] No space left on device
+
+During handling of the above exception, another exception occurred:
+
+OSError: [Errno 28] No space left on device
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/z37mao/Genova/genova/utils/genova_preprocess.py", line 317, in <module>
+  

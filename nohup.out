@@ -1,73 +1,0 @@
-WARNING:torch.distributed.run:
-*****************************************
-Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
-*****************************************
-wandb: Currently logged in as: amadeusandiris (use `wandb login --relogin` to force relogin)
-wandb: Tracking run with wandb version 0.12.11
-wandb: Run data is saved locally in /home/z37mao/Genova/wandb/run-20220306_161849-4ifhrane
-wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run feasible-morning-10
-wandb: ⭐️ View project at https://wandb.ai/amadeusandiris/Genova
-wandb: 🚀 View run at https://wandb.ai/amadeusandiris/Genova/runs/4ifhrane
-Traceback (most recent call last):
-  File "/home/z37mao/Genova/train_encoder.py", line 197, in <module>
-    scaler.step(optimizer)
-  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/site-packages/torch/cuda/amp/grad_scaler.py", line 338, in step
-    retval = self._maybe_opt_step(optimizer, optimizer_state, *args, **kwargs)
-  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/site-packages/torch/cuda/amp/grad_scaler.py", line 284, in _maybe_opt_step
-    if not sum(v.item() for v in optimizer_state["found_inf_per_device"].values()):
-  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/site-packages/torch/cuda/amp/grad_scaler.py", line 284, in <genexpr>
-    if not sum(v.item() for v in optimizer_state["found_inf_per_device"].values()):
-KeyboardInterrupt
-
-wandb: Waiting for W&B process to finish... (failed 255). Press Control-C to abort syncing.
-wandb: - 0.001 MB of 0.001 MB uploaded (0.000 MB deduped)wandb: \ 0.001 MB of 0.001 MB uploaded (0.000 MB deduped)wandb: | 0.001 MB of 0.010 MB uploaded (0.000 MB deduped)wandb: / 0.001 MB of 0.010 MB uploaded (0.000 MB deduped)wandb: - 0.010 MB of 0.010 MB uploaded (0.000 MB deduped)wandb: \ 0.010 MB of 0.010 MB uploaded (0.000 MB deduped)wandb: | 0.010 MB of 0.010 MB uploaded (0.000 MB deduped)wandb: / 0.010 MB of 0.010 MB uploaded (0.000 MB deduped)wandb: - 0.010 MB of 0.010 MB uploaded (0.000 MB deduped)wandb: \ 0.010 MB of 0.010 MB uploaded (0.000 MB deduped)wandb:                                                                                
-wandb: 
-wandb: Run history:
-wandb:  accuracy ▄▄▂▄▄▁▄█▆▄▃▄▄▄▇▄▄▄▄▆▄█▂▂▆▇▇▆▆▅▆▇▆▇▆▇▂▄▅▂
-wandb:      loss ▄▅▇▄▄█▆▁▄▇▆▅▆▄▃▅▅▆▅▃▆▁▇▇▃▂▁▂▃▄▃▁▃▃▃▁▆▅▄▅
-wandb: precision ▅▃▃▄▅▁▅█▆▃▄▄▄▅▇▅▄▄▆▆▄▇▄▁▆▇█▆▆▅▇█▆▇▆█▂▄▅▃
-wandb:    recall ▄▄▂▅▃▁▃▇▆▄▃▃▄▃▆▃▄▄▃▅▄█▁▃▅▇▆▆▅▅▅▆▆▆▆▆▂▄▄▂
-wandb: 
-wandb: Run summary:
-wandb:  accuracy 0.99674
-wandb:      loss 0.00934
-wandb: precision 0.98703
-wandb:    recall 0.98318
-wandb: 
-wandb: Synced feasible-morning-10: https://wandb.ai/amadeusandiris/Genova/runs/4ifhrane
-wandb: Synced 6 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
-wandb: Find logs at: ./wandb/run-20220306_161849-4ifhrane/logs
-WARNING:torch.distributed.elastic.multiprocessing.api:Sending process 2728582 closing signal SIGTERM
-WARNING:torch.distributed.elastic.multiprocessing.api:Sending process 2728583 closing signal SIGTERM
-WARNING:torch.distributed.elastic.multiprocessing.api:Sending process 2728584 closing signal SIGTERM
-ERROR:torch.distributed.elastic.multiprocessing.api:failed (exitcode: -2) local_rank: 0 (pid: 2728581) of binary: /home/z37mao/anaconda3/envs/genova_torch/bin/python
-Traceback (most recent call last):
-  File "/home/z37mao/anaconda3/envs/genova_torch/bin/torchrun", line 33, in <module>
-    sys.exit(load_entry_point('torch==1.10.2', 'console_scripts', 'torchrun')())
-  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 345, in wrapper
-    return f(*args, **kwargs)
-  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/site-packages/torch/distributed/run.py", line 719, in main
-    run(args)
-  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/site-packages/torch/distributed/run.py", line 710, in run
-    elastic_launch(
-  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/site-packages/torch/distributed/launcher/api.py", line 131, in __call__
-    return launch_agent(self._config, self._entrypoint, list(args))
-  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/site-packages/torch/distributed/launcher/api.py", line 259, in launch_agent
-    raise ChildFailedError(
-torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
-=======================================================
-train_encoder.py FAILED
--------------------------------------------------------
-Failures:
-  <NO_OTHER_FAILURES>
--------------------------------------------------------
-Root Cause (first observed failure):
-[0]:
-  time      : 2022-03-06_18:50:55
-  host      : ming-gpu-v100.cs.uwaterloo.ca
-  rank      : 0 (local_rank: 0)
-  exitcode  : -2 (pid: 2728581)
-  error_file: <N/A>
-  traceback : Signal 2 (SIGINT) received by PID 2728581
-=======================================================

@@ -1,386 +1,318 @@
-import zmq
-import math
+import sys
+import gzip
+import torch
 import pickle
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
+from glob import glob
 from BasicClass import Residual_seq, Ion
-from itertools import combinations_with_replacement, product
-from edge_matrix_gen import edge_matrix_generator, typological_sort_floyd_warshall, gen_edge_input 
+from itertools import combinations_with_replacement
+from edge_matrix_gen import edge_matrix_generator, typological_sort_floyd_warshall, gen_edge_input
 
-def label_ion_verification(theo_moverz_list, product_ion_moverz_list):
-    #这个函数是为了检测二级谱图所对应的序列有没有对应离子。
-    real_moverz = np.append(product_ion_moverz_list, np.inf)
-    index = np.searchsorted(real_moverz, theo_moverz_list)
-    return np.logical_or(np.abs(real_moverz[index]-theo_moverz_list)<0.02,np.abs(real_moverz[index-1]-theo_moverz_list)<0.02)
+all_edge_mass = []
+aalist = Residual_seq.output_aalist()
+for num in range(1,7):
+    for i in combinations_with_replacement(aalist,num):
+        all_edge_mass.append(Residual_seq(i).mass)
+all_edge_mass = np.unique(np.array(all_edge_mass))
 
-def spec_verification(seq,product_ions_moverz,muti_charged):
-    #验证二级质谱是否符合制图条件
-    nterm = Residual_seq(seq).step_mass[:-1]
-    cterm = Residual_seq(seq).mass-Residual_seq(seq).step_mass[:-1]
+psm_head = []
+for psm_file_name in glob('/data/z37mao/genova_new/*_PSMs.csv'):
+    psm_head_temp = pd.read_csv(psm_file_name)
+    psm_head_temp['File ID'] = psm_file_name.split('/')[-1][:-9]+':'+psm_head_temp['File ID']
+    psm_head.append(psm_head_temp)
+psm_head = pd.concat(psm_head)
+psm_head = psm_head.set_index('File ID')
 
-    a1ion_theomoverz = Ion.sequencemz2ion(nterm,'1a')
-    b1ion_theomoverz = Ion.sequencemz2ion(nterm,'1b')
-    y1ion_theomoverz = Ion.sequencemz2ion(cterm,'1y')
+with open('candidate_mass','rb') as f:
+    candidate_mass = pickle.load(f)
+class PeakFeatureGeneration:
+    def __init__(self, local_sliding_window, data_acquisition_upper_limit):
+        self.local_sliding_window = local_sliding_window
+        self.data_acquisition_upper_limit = data_acquisition_upper_limit
+        
+    def __call__(self, product_ions_moverz, product_ions_intensity):
+        normalize_moverz = self.normalize_moverzCal(product_ions_moverz)
+        relative_intensity = self.relative_intensityCal(product_ions_intensity)
+        total_rank = self.total_rankCal(product_ions_intensity)
+        total_halfrank = self.total_halfrankCal(product_ions_intensity)
+        local_mask = self.local_intensity_mask(product_ions_moverz)
+        local_significant = self.local_significantCal(local_mask, product_ions_intensity)
+        local_rank = self.local_rankCal(local_mask,product_ions_intensity)
+        local_halfrank = self.local_halfrankCal(local_mask,product_ions_intensity)
+        local_reletive_intensity = self.local_reletive_intensityCal(local_mask,product_ions_intensity)
 
-    a1_existed = label_ion_verification(a1ion_theomoverz,product_ions_moverz[product_ions_moverz<200])
-    b1_existed = label_ion_verification(b1ion_theomoverz,product_ions_moverz)
-    y1_existed = label_ion_verification(y1ion_theomoverz,product_ions_moverz)
+        product_ions_feature = np.stack([normalize_moverz,
+                                         relative_intensity,
+                                         local_significant,
+                                         total_rank,
+                                         total_halfrank,
+                                         local_rank,
+                                         local_halfrank,
+                                         local_reletive_intensity]).transpose()
 
-    if muti_charged:
-        y2ion_theomoverz = Ion.sequencemz2ion(cterm,'2y')
-        y2_existed = label_ion_verification(y2ion_theomoverz,product_ions_moverz[product_ions_moverz>400])
-        seq_ion_existed = a1_existed+b1_existed+y1_existed+y2_existed
-    else:
-        seq_ion_existed = a1_existed+b1_existed+y1_existed
+        return product_ions_feature
+    
+    def normalize_moverzCal(self, moverz):
+        return np.exp(-moverz/self.data_acquisition_upper_limit)
 
-    non_existed_pos = np.where(np.logical_not(seq_ion_existed))[0]
-    return np.any((non_existed_pos[1:]-non_existed_pos[:-1])==1)
+    def relative_intensityCal(self, intensity):
+        return intensity/intensity.max()
 
-def graph_verification(seq,graphnode_moverz):
-    seq_node_existed = label_ion_verification(Residual_seq(seq).step_mass[:-1],graphnode_moverz)
-    non_existed_pos = np.where(np.logical_not(seq_node_existed))[0]
-    return np.any((non_existed_pos[1:]-non_existed_pos[:-1])==1)
+    def local_intensity_mask(self, mz):
+        right_boundary = np.reshape(mz+self.local_sliding_window,(-1,1))
+        left_boundary = np.reshape(mz-self.local_sliding_window,(-1,1))
+        mask = np.logical_and(right_boundary>mz,left_boundary<mz)
+        return mask
 
-def record_filter(theo_moverz_list, moverz_list, type_flag=None):
-    #用预先生成的a，b，y ion list对离子进行过滤，将一部分噪音离子过滤掉
-    index = np.searchsorted(theo_moverz_list, moverz_list)
-    mask = np.logical_or(np.abs(theo_moverz_list[index]-moverz_list)<0.02,np.abs(theo_moverz_list[index-1]-moverz_list)<0.02)
-    if type_flag=='ion':
-        mask = np.logical_or(mask,moverz_list>=400)
-        return moverz_list[mask]
-    elif type_flag=='graph':
-        mask = np.logical_or(mask,moverz_list>=1000)
-        return moverz_list[mask]
+    def local_significantCal(self, mask, intensity): #This feature need to be fixed use signal to ratio to replace intensity.
+        #这个feature为了要映射到[1,+infinity)并且不让tan在正无穷和负无穷之间来回横跳，特意在最小intentisy的基础上减了0.5
+        #让原始值到不了1
+        local_significant=[]
+        for i in range(len(intensity)):
+            local_intensity_list = intensity[mask[i]]
+            local_significant.append(np.tanh((intensity[i]/local_intensity_list.min()-1)/2))
+        return np.array(local_significant)
 
-def graphnode_moverz_generator(theo_graphnode_list, precursor_ion_moverz, precursor_ion_charge, product_ions_moverz, muti_charged):
-    seqnode_1a_index = np.where(product_ions_moverz<200)[0]
-    seqnode_1a_nterm = Ion.peak2sequencemz(product_ions_moverz[seqnode_1a_index],'1a')
-    seqnode_1b_nterm = Ion.peak2sequencemz(product_ions_moverz,'1b')
-    seqnode_1y_cterm = Ion.peak2sequencemz(product_ions_moverz,'1y')
-    seqnode_1y_nterm = Ion.precursorion2mass(precursor_ion_moverz,precursor_ion_charge) - seqnode_1y_cterm
+    def local_rankCal(self, mask, intensity):
+        local_rank = []
+        for i in range(len(intensity)):
+            local_intensity_list = intensity[mask[i]]
+            local_rank.append(np.sum(intensity[i]>local_intensity_list)/len(local_intensity_list))
+        return np.array(local_rank)
 
-    if muti_charged:
-        seqnode_2y_index = np.where(product_ions_moverz>400)[0]
-        seqnode_2y_cterm = Ion.peak2sequencemz(product_ions_moverz[seqnode_2y_index],'2y')
-        seqnode_2y_nterm = Ion.precursorion2mass(precursor_ion_moverz,precursor_ion_charge) - seqnode_2y_cterm
-        graphnode_moverz = np.concatenate([seqnode_1a_nterm,seqnode_1b_nterm,seqnode_1y_nterm,seqnode_2y_nterm])
-    else:
-        graphnode_moverz = np.concatenate([seqnode_1a_nterm,seqnode_1b_nterm,seqnode_1y_nterm])
+    def local_halfrankCal(self, mask, intensity):
+        local_halfrank = []
+        for i in range(len(intensity)):
+            local_intensity_list = intensity[mask[i]]
+            local_halfrank.append(np.sum(intensity[i]/2>local_intensity_list)/len(local_intensity_list))
+        return np.array(local_halfrank)
 
-    graphnode_moverz = record_filter(theo_graphnode_list, graphnode_moverz, type_flag='graph')
-    graphnode_moverz = graphnode_moverz[graphnode_moverz<Ion.precursorion2mass(precursor_ion_moverz,precursor_ion_charge)]
-    graphnode_moverz.sort()
-    return graphnode_moverz
+    def local_reletive_intensityCal(self, mask, intensity):
+        local_reletive_intensity=[]
+        for i in range(len(intensity)):
+            local_intensity_list = intensity[mask[i]]
+            local_reletive_intensity.append(intensity[i]/local_intensity_list.max())
+        return np.array(local_reletive_intensity)
 
-def candidate_subgraph_generator(precursor_ion_moverz, precursor_ion_charge, product_ions_moverz, product_ions_feature):
-    candidate_subgraphnode_moverz = []
+    def total_rankCal(self, intensity):
+        temp_intensity = intensity.reshape((-1,1))
+        return np.sum(temp_intensity>intensity,axis=1)/len(intensity)
 
-    candidate_subgraphnode_moverz.append(Ion.peak2sequencemz(product_ions_moverz,'1a'))
-    candidate_subgraphnode_moverz.append(Ion.peak2sequencemz(product_ions_moverz,'1a-NH3'))
-    candidate_subgraphnode_moverz.append(Ion.peak2sequencemz(product_ions_moverz,'1a-H2O'))
-    candidate_subgraphnode_moverz.append(Ion.peak2sequencemz(product_ions_moverz,'1b'))
-    candidate_subgraphnode_moverz.append(Ion.peak2sequencemz(product_ions_moverz,'1b-NH3'))
-    candidate_subgraphnode_moverz.append(Ion.peak2sequencemz(product_ions_moverz,'1b-H2O'))
-    candidate_subgraphnode_moverz.append(Ion.precursorion2mass(precursor_ion_moverz, precursor_ion_charge)-Ion.peak2sequencemz(product_ions_moverz,'1y'))
-    candidate_subgraphnode_moverz.append(Ion.precursorion2mass(precursor_ion_moverz, precursor_ion_charge)-Ion.peak2sequencemz(product_ions_moverz,'1y-NH3'))
-    candidate_subgraphnode_moverz.append(Ion.precursorion2mass(precursor_ion_moverz, precursor_ion_charge)-Ion.peak2sequencemz(product_ions_moverz,'1y-H2O'))
+    def total_halfrankCal(self, intensity):
+        half_intensity = intensity/2
+        half_intensity = half_intensity.reshape((-1,1))
+        return np.sum(half_intensity>intensity,axis=1)/len(intensity)
 
-    candidate_subgraphnode_moverz.append(Ion.peak2sequencemz(product_ions_moverz,'2a'))
-    candidate_subgraphnode_moverz.append(Ion.peak2sequencemz(product_ions_moverz,'2a-NH3'))
-    candidate_subgraphnode_moverz.append(Ion.peak2sequencemz(product_ions_moverz,'2a-H2O'))
-    candidate_subgraphnode_moverz.append(Ion.peak2sequencemz(product_ions_moverz,'2b'))
-    candidate_subgraphnode_moverz.append(Ion.peak2sequencemz(product_ions_moverz,'2b-NH3'))
-    candidate_subgraphnode_moverz.append(Ion.peak2sequencemz(product_ions_moverz,'2b-H2O'))
-    candidate_subgraphnode_moverz.append(Ion.precursorion2mass(precursor_ion_moverz, precursor_ion_charge)-Ion.peak2sequencemz(product_ions_moverz,'2y'))
-    candidate_subgraphnode_moverz.append(Ion.precursorion2mass(precursor_ion_moverz, precursor_ion_charge)-Ion.peak2sequencemz(product_ions_moverz,'2y-NH3'))
-    candidate_subgraphnode_moverz.append(Ion.precursorion2mass(precursor_ion_moverz, precursor_ion_charge)-Ion.peak2sequencemz(product_ions_moverz,'2y-H2O'))
+class GraphGenerator:
+    def __init__(self,
+                 candidate_mass,
+                 theo_edge_mass,
+                 local_sliding_window=50, 
+                 data_acquisition_upper_limit=3500,
+                 mass_error_da=0.02, 
+                 mass_error_ppm=5):
+        self.mass_error_da = mass_error_da
+        self.mass_error_ppm = mass_error_ppm
+        self.theo_edge_mass = theo_edge_mass
+        self.candidate_mass = candidate_mass
+        self.data_acquisition_upper_limit = data_acquisition_upper_limit
+        self.peak_feature_generation = PeakFeatureGeneration(local_sliding_window,data_acquisition_upper_limit)
+        self.n_term_ion_list = ['1a','1a-NH3','1a-H2O','1b','1b-NH3','1b-H2O','2a','2a-NH3','2a-H2O','2b','2b-NH3','2b-H2O']
+        self.c_term_ion_list = ['1y','1y-NH3','1y-H2O','2y','2y-NH3','2y-H2O']
+        
+    def __call__(self,product_ions_moverz, product_ions_intensity, precursor_ion_mass, muti_charged):
+        peak_feature = self.peak_feature_generation(product_ions_moverz, product_ions_intensity)
+        subnode_mass, subnode_feature = self.candidate_subgraph_generator(precursor_ion_mass, product_ions_moverz, peak_feature)
+        node_mass = self.graphnode_mass_generator(precursor_ion_mass, product_ions_moverz, muti_charged)
+        #assert node_mass.size<=512
+        node_feat, node_sourceion = self.graphnode_feature_generator(node_mass, subnode_mass, subnode_feature, precursor_ion_mass)
+        subedge_maxnum, edge_type, edge_error = self.edge_generator(node_mass,precursor_ion_mass)
+        rel_type, rel_error, dist, rel_pos, rel_coor = self.multihop_rel_generator(subedge_maxnum, edge_type, edge_error)
+        graph_label = self.graph_label_generator(seq, node_mass, precursor_ion_mass)
+        mask = edge_type>0
+        edge_type = edge_type[mask].reshape((-1,1))
+        edge_error = edge_error[mask].reshape((-1,1))
+        edge_coor = np.array(np.where(mask)).T
+        
+        node_input = {'node_feat': torch.Tensor(node_feat),
+                      'node_sourceion': torch.IntTensor(node_sourceion)}
+        
+        rel_input = {'rel_type': torch.IntTensor(rel_type),
+                     'rel_error': torch.Tensor(rel_error),
+                     'dist': torch.IntTensor(dist),
+                     'rel_pos': torch.IntTensor(rel_pos),
+                     'rel_coor': torch.LongTensor(rel_coor)}
+        
+        edge_input = {'edge_type': torch.IntTensor(edge_type),
+                      'edge_error': torch.Tensor(edge_error),
+                      'edge_coor': torch.LongTensor(edge_coor)}
+        
+        graph_label = torch.IntTensor(graph_label)
+        
+        return node_mass, node_input, rel_input, edge_input, graph_label
+    
+    def candidate_subgraph_generator(self, precursor_ion_mass, product_ions_moverz, product_ions_feature):
+        candidate_subgraphnode_moverz = []
+        candidate_subgraphnode_moverz += [Ion.peak2sequencemz(product_ions_moverz,ion) for ion in self.n_term_ion_list]
+        candidate_subgraphnode_moverz += [precursor_ion_mass-Ion.peak2sequencemz(product_ions_moverz,ion) for ion in self.c_term_ion_list]
+        candidate_subgraphnode_moverz = np.concatenate(candidate_subgraphnode_moverz)
+        candidate_subgraphnode_feature = []
+        for i in range(2,len(self.n_term_ion_list)+len(self.c_term_ion_list)+2):
+            candidate_subgraphnode_source = i*np.ones([product_ions_moverz.size, 1])
+            candidate_subgraphnode_feature.append(np.concatenate((product_ions_feature,candidate_subgraphnode_source),axis=1))
+        candidate_subgraphnode_feature = np.concatenate(candidate_subgraphnode_feature)
+        
+        candidate_subgraphnode_moverz = np.insert(candidate_subgraphnode_moverz,
+                                                  [0,candidate_subgraphnode_moverz.size],
+                                                  [0,precursor_ion_mass])
+        sorted_index = np.argsort(candidate_subgraphnode_moverz)
+        candidate_subgraphnode_moverz = candidate_subgraphnode_moverz[sorted_index]
+        
+        candidate_subgraphnode_feature = np.concatenate([np.array([1]*9).reshape(1,-1),
+                                                         candidate_subgraphnode_feature,
+                                                         np.array([1]*9).reshape(1,-1)],axis=0)
+        candidate_subgraphnode_feature = candidate_subgraphnode_feature[sorted_index]
+        return candidate_subgraphnode_moverz, candidate_subgraphnode_feature
 
-    candidate_subgraphnode_moverz = np.concatenate(candidate_subgraphnode_moverz)
+    def record_filter(self, mass_list, precursor_ion_mass=None):
+        if precursor_ion_mass:
+            mass_threshold = self.mass_error_da+self.mass_error_ppm*precursor_ion_mass*1e-6
+        else:
+            mass_threshold = self.mass_error_da
+        
+        mask = self.candidate_mass.searchsorted(mass_list-mass_threshold)!=self.candidate_mass.searchsorted(mass_list+mass_threshold)
+        mask = np.logical_or(mask,mass_list>=self.candidate_mass.max())
+        return mass_list[mask], mask
 
-    candidate_subgraphnode_feature = []
-    for i in range(1,19):
-        candidate_subgraphnode_source = np.zeros([product_ions_moverz.size, 1])
-        candidate_subgraphnode_source[:,0] = i
-        candidate_subgraphnode_feature.append(np.concatenate((product_ions_feature,candidate_subgraphnode_source),axis=1))
-    candidate_subgraphnode_feature = np.concatenate(candidate_subgraphnode_feature)
-    sorted_index = np.argsort(candidate_subgraphnode_moverz)
+    def graphnode_mass_generator(self, precursor_ion_mass, product_ions_moverz, muti_charged):
+        #1a ion
+        node_1a_mass_nterm, _ = self.record_filter(Ion.peak2sequencemz(product_ions_moverz[product_ions_moverz<250],'1a'))
+        _, mask = self.record_filter(precursor_ion_mass-node_1a_mass_nterm,precursor_ion_mass)
+        node_1a_mass_nterm = node_1a_mass_nterm[mask]
+        #1b ion
+        node_1b_mass_nterm, _ = self.record_filter(Ion.peak2sequencemz(product_ions_moverz,'1b'))
+        _, mask = self.record_filter(precursor_ion_mass-node_1b_mass_nterm,precursor_ion_mass)
+        node_1b_mass_nterm = node_1b_mass_nterm[mask]
+        #1y ion
+        node_1y_mass_cterm, _ = self.record_filter(Ion.peak2sequencemz(product_ions_moverz,'1y'))
+        node_1y_mass_nterm, _ = self.record_filter(precursor_ion_mass-node_1y_mass_cterm,precursor_ion_mass)
+        #2y ion
+        node_2y_mass_cterm, _ = self.record_filter(Ion.peak2sequencemz(product_ions_moverz[product_ions_moverz>400],'2y'))
+        node_2y_mass_nterm, _ = self.record_filter(precursor_ion_mass-node_2y_mass_cterm,precursor_ion_mass)
+        if muti_charged:
+            graphnode_mass = np.concatenate([node_1a_mass_nterm,node_1b_mass_nterm,node_1y_mass_nterm,node_2y_mass_nterm])
+        else:
+            graphnode_mass = np.concatenate([node_1a_mass_nterm,node_1b_mass_nterm,node_1y_mass_nterm])
+        graphnode_mass = np.unique(graphnode_mass)
+        graphnode_mass = np.insert(graphnode_mass,
+                                   [0,graphnode_mass.size],
+                                   [0,precursor_ion_mass])
+        return graphnode_mass
+    
+    def graphnode_feature_generator(self, graphnode_mass, subnode_mass, subnode_feature, precursor_ion_mass):
+        mass_threshold = 2*(self.mass_error_da+self.mass_error_ppm*precursor_ion_mass*1e-6)
+        lower_bounds = subnode_mass.searchsorted(graphnode_mass - mass_threshold)
+        higher_bounds = subnode_mass.searchsorted(graphnode_mass + mass_threshold)
+        subnode_maxnum = (higher_bounds-lower_bounds).max()
+        node_feature = []
+        for i,(lower_bound,higher_bound) in enumerate(zip(lower_bounds,higher_bounds)):
+            mass_merge_error = np.abs(graphnode_mass[i] - subnode_mass[np.arange(lower_bound,higher_bound)])
+            mass_merge_index = np.argsort(mass_merge_error)
+            mass_merge_error = np.exp(-np.abs(mass_merge_error)/mass_threshold)
+            mass_merge_feat = np.concatenate([np.exp(-graphnode_mass[i]*np.ones((higher_bound-lower_bound,1))/self.data_acquisition_upper_limit),
+                                              subnode_feature[np.arange(lower_bound,higher_bound)],
+                                              mass_merge_error.reshape(-1,1)],axis=1)
+            mass_merge_feat = mass_merge_feat[mass_merge_index]
+            mass_merge_feat = np.pad(mass_merge_feat,((0,subnode_maxnum-(higher_bound-lower_bound)),(0,0)))
+            node_feature.append(mass_merge_feat)
+        node_feature = np.stack(node_feature)
+        node_feature[0,1:,:]=0
+        node_sourceion = node_feature[:,:,-2]
+        node_feat = np.delete(node_feature,-2,axis=2)
+        return node_feat, node_sourceion
+    
+    def edge_generator(self, graphnode_moverz, precursor_ion_mass):
+        n = graphnode_moverz.size
+        mass_threshold = 2*(self.mass_error_da+self.mass_error_ppm*precursor_ion_mass*1e-6)
+        mass_difference = np.zeros((n,n),dtype=np.float64)
+        for x in range(graphnode_moverz.size-1):
+            mass_difference[x,x+1:] = graphnode_moverz[x+1:] - graphnode_moverz[x]
+        start_edge_type = self.theo_edge_mass.searchsorted(mass_difference-mass_threshold)
+        end_edge_type = self.theo_edge_mass.searchsorted(mass_difference+mass_threshold)
 
-    return candidate_subgraphnode_moverz[sorted_index], candidate_subgraphnode_feature[sorted_index]
+        #######
+        #边信息构建
+        subedge_maxnum = np.max(end_edge_type-start_edge_type)
+        edge_type, edge_error = edge_matrix_generator(n,
+                                                      mass_threshold,
+                                                      subedge_maxnum,
+                                                      self.theo_edge_mass,
+                                                      mass_difference,
+                                                      start_edge_type,
+                                                      end_edge_type)
+        
+        return subedge_maxnum, edge_type, edge_error
+    
+    def multihop_rel_generator(self, subedge_maxnum, edge_type, edge_error):
+        n = edge_type.shape[0]
+        adjacency_matrix = np.any(edge_type,axis=-1).astype(int)
+        
+        dist, predecessors = typological_sort_floyd_warshall(n, adjacency_matrix)
 
-def graphnode_generator(theo_ion_moverz, theo_graphnode_moverz, precursor_ion_moverz, precursor_ion_charge, product_ions_moverz, product_ions_feature, muti_charged):
-    filted_product_ions_moverz = record_filter(theo_ion_moverz, product_ions_moverz, 'ion')
-    graphnode_moverz = graphnode_moverz_generator(theo_graphnode_moverz, precursor_ion_moverz, precursor_ion_charge, filted_product_ions_moverz, muti_charged)
-    candidate_subgraph_node_moverz, candidate_subgraph_node_feature = candidate_subgraph_generator(precursor_ion_moverz, precursor_ion_charge, product_ions_moverz, product_ions_feature)
+        max_dist = dist.max()
+        rel_type, rel_error = gen_edge_input(n,
+                                             max_dist,
+                                             subedge_maxnum,
+                                             predecessors,
+                                             edge_type,
+                                             edge_error,
+                                             adjacency_matrix)
 
-    start_indexes = np.searchsorted(candidate_subgraph_node_moverz,graphnode_moverz-0.04)
-    end_indexes = np.searchsorted(candidate_subgraph_node_moverz,graphnode_moverz+0.04)
-    max_subnodegraph_num = np.max(end_indexes-start_indexes)
-    graphnode_feature = []
+        mask = rel_type>0
+        rel_type = rel_type[mask].reshape((-1,1))
+        rel_error = rel_error[mask].reshape((-1,1))
+        rel_coor = np.array(np.where(mask)).T
+        rel_pos = rel_coor[-2]
+        
+        return rel_type, rel_error, dist, rel_pos, rel_coor
+    
+    def graph_label_generator(self, seq, node_mass, precursor_ion_mass):
+        theo_node_mass = np.insert(Residual_seq(seq).step_mass,0,0)
+        mass_threshold = self.mass_error_da+self.mass_error_ppm*precursor_ion_mass*1e-6
+        start_index = node_mass.searchsorted(theo_node_mass-mass_threshold)
+        end_index = node_mass.searchsorted(theo_node_mass+mass_threshold)
+        graph_label = np.zeros((node_mass.size,theo_node_mass.size))
+        for i, (lower_bound, higher_bound) in enumerate(zip(start_index, end_index)):
+            graph_label[:,i][lower_bound:higher_bound] = 1
+        return graph_label
 
-    for i in range(graphnode_moverz.size):
-        subgraph_node_feature_buffer = np.zeros((max_subnodegraph_num,10))
-        subgraph_length = end_indexes[i] - start_indexes[i]
-        subgraph_node_feature_buffer[:subgraph_length,:9] = candidate_subgraph_node_feature[start_indexes[i]:end_indexes[i]]
-        subgraph_node_feature_buffer[:subgraph_length, -1] = np.exp(-np.abs(graphnode_moverz[i]-candidate_subgraph_node_moverz[start_indexes[i]:end_indexes[i]])/0.04)
-        graphnode_feature.append(subgraph_node_feature_buffer)
-
-    #add start and end vertices
-    start_graphnode_feature = np.zeros([max_subnodegraph_num,10])
-    start_graphnode_feature[0] = np.array([1]+[1]*7+[19]+[1])
-    end_graphnode_feature = np.zeros([max_subnodegraph_num,10])
-    end_graphnode_feature[0] = np.array([np.exp(-Ion.precursorion2mass(precursor_ion_moverz,precursor_ion_charge)/3500)]+[1]*7+[19]+[1])
-    graphnode_feature = [start_graphnode_feature] + graphnode_feature + [end_graphnode_feature]
-    graphnode_feature = np.stack(graphnode_feature)
-
-    graphnode_moverz = np.insert(graphnode_moverz,0,0)
-    graphnode_moverz = np.append(graphnode_moverz, Ion.precursorion2mass(precursor_ion_moverz,precursor_ion_charge))
-    return graphnode_moverz, graphnode_feature
-
-##All candidate feature
-
-def normalize_moverzCal(moverz, data_acquisition_upper_limit):
-    return np.exp(-moverz/data_acquisition_upper_limit)
-
-def relative_intensityCal(intensity):
-    return intensity/intensity.max()
-
-def local_intensity_mask(mz):
-    right_boundary = np.reshape(mz+50,(-1,1))
-    left_boundary = np.reshape(mz-50,(-1,1))
-    mask = np.logical_and(right_boundary>mz,left_boundary<mz)
-    return mask
-
-def local_significantCal(mask, intensity): #This feature need to be fixed use signal to ratio to replace intensity.
-    #这个feature为了要映射到[1,+infinity)并且不让tan在正无穷和负无穷之间来回横跳，特意在最小intentisy的基础上减了0.5
-    #让原始值到不了1
-    local_significant=[]
-    for i in range(len(intensity)):
-        local_intensity_list = intensity[mask[i]]
-        local_significant.append(np.tanh((intensity[i]/local_intensity_list.min()-1)/2))
-    return np.array(local_significant)
-
-def local_rankCal(mask,intensity):
-    local_rank = []
-    for i in range(len(intensity)):
-        local_intensity_list = intensity[mask[i]]
-        local_rank.append(np.sum(intensity[i]>local_intensity_list)/len(local_intensity_list))
-    return np.array(local_rank)
-
-def local_halfrankCal(mask,intensity):
-    local_halfrank = []
-    for i in range(len(intensity)):
-        local_intensity_list = intensity[mask[i]]
-        local_halfrank.append(np.sum(intensity[i]/2>local_intensity_list)/len(local_intensity_list))
-    return np.array(local_halfrank)
-
-def local_reletive_intensityCal(mask,intensity):
-    local_reletive_intensity=[]
-    for i in range(len(intensity)):
-        local_intensity_list = intensity[mask[i]]
-        local_reletive_intensity.append(intensity[i]/local_intensity_list.max())
-    return np.array(local_reletive_intensity)
-
-def total_rankCal(intensity):
-    temp_intensity = intensity.reshape((-1,1))
-    return np.sum(temp_intensity>intensity,axis=1)/len(intensity)
-
-def total_halfrankCal(intensity):
-    half_intensity = intensity/2
-    half_intensity = half_intensity.reshape((-1,1))
-    return np.sum(half_intensity>intensity,axis=1)/len(intensity)
-
-def feature_genrator(product_ions_moverz, product_ions_intensity, data_acquisition_upper_limit):
-    normalize_moverz = normalize_moverzCal(product_ions_moverz, data_acquisition_upper_limit)
-    relative_intensity = relative_intensityCal(product_ions_intensity)
-    total_rank = total_rankCal(product_ions_intensity)
-    total_halfrank = total_halfrankCal(product_ions_intensity)
-    local_mask = local_intensity_mask(product_ions_moverz)
-    local_significant = local_significantCal(local_mask, product_ions_intensity)
-    local_rank = local_rankCal(local_mask,product_ions_intensity)
-    local_halfrank = local_halfrankCal(local_mask,product_ions_intensity)
-    local_reletive_intensity = local_reletive_intensityCal(local_mask,product_ions_intensity)
-
-    product_ions_feature = np.stack([normalize_moverz,
-                                     relative_intensity,
-                                     local_significant,
-                                     total_rank,
-                                     total_halfrank,
-                                     local_rank,
-                                     local_halfrank,
-                                     local_reletive_intensity]).transpose()
-
-    return product_ions_feature
-
-def graph_edge_filter(adjacent_matrix):
-    num_node = adjacent_matrix.shape[0]
-    keep_mask = np.ones_like(adjacent_matrix,dtype=bool)
-    for y in range(1,num_node-1):
-        if not np.any(np.logical_and(keep_mask[:,y],adjacent_matrix[:,y])):
-            keep_mask[:, y] = False
-            keep_mask[y, :] = False
-    for x in range(num_node-2,0,-1):
-        if not np.any(np.logical_and(keep_mask[x,:],adjacent_matrix[x,:])):
-            keep_mask[x, :] = False
-            keep_mask[:, x] = False
-    return keep_mask
-
-def graphnode_equivalence_filter(start_edge_type, end_edge_type, graphnode_moverz):
-    num_node = graphnode_moverz.size
-
-    equal_node = {}
-    registered_node = {i:0 for i in range(1,num_node-1)}
-
-    for start_index in range(1,num_node-2):
-        if registered_node[start_index]!=0: continue
-        for search_index in range(start_index+1,num_node-1):
-            if graphnode_moverz[search_index]-graphnode_moverz[start_index]>0.04: break
-            if np.all(np.equal(end_edge_type[:,start_index][:start_index],end_edge_type[:,search_index][:start_index])):
-                if np.all(np.equal(start_edge_type[:,start_index][:start_index],start_edge_type[:,search_index][:start_index])):
-                    if np.all(np.equal(end_edge_type[start_index][search_index+1:],end_edge_type[search_index][search_index+1:])):
-                        if np.all(np.equal(start_edge_type[start_index][search_index+1:],start_edge_type[search_index][search_index+1:])):
-                            if np.all(start_edge_type[start_index][start_index+1:search_index+1]==end_edge_type[start_index][start_index+1:search_index+1]):
-                                if np.all(start_edge_type[:,search_index][start_index:search_index]==end_edge_type[:,search_index][start_index:search_index]):
-                                    try:
-                                        equal_node[start_index].append(search_index)
-                                        registered_node[search_index] = start_index
-                                    except KeyError:
-                                        equal_node[start_index] = [start_index, search_index]
-                                        registered_node[search_index] = start_index
-
-    delete_index = []
-    for equivalent_graphnode_group in equal_node.values():
-        equivalent_graphnode_group.pop(math.ceil(len(equivalent_graphnode_group)/2)-1)
-        delete_index+=equivalent_graphnode_group
-    equivalent_graphnode_mask = np.ones((num_node, num_node),dtype=bool)
-    equivalent_graphnode_mask[:,delete_index]=False
-    equivalent_graphnode_mask[delete_index,:]=False
-    return equivalent_graphnode_mask
-
-def edge_generator(theo_edge_mass, graphnode_moverz, graphnode_feature):
-    mass_difference = np.zeros((graphnode_moverz.size,graphnode_moverz.size),dtype=np.float64)
-    for x in range(graphnode_moverz.size-1):
-        mass_difference[x,x+1:] = graphnode_moverz[x+1:] - graphnode_moverz[x]
-    start_edge_type = theo_edge_mass.searchsorted(mass_difference-0.04)
-    end_edge_type = theo_edge_mass.searchsorted(mass_difference+0.04)
-
-    #######
-    #点连通性筛选
-    mask = graph_edge_filter((end_edge_type-start_edge_type)>0)
-    start_edge_type = start_edge_type[mask].reshape((mask[0].sum(),mask[0].sum()))
-    end_edge_type = end_edge_type[mask].reshape((mask[0].sum(),mask[0].sum()))
-    mass_difference = mass_difference[mask].reshape((mask[0].sum(),mask[0].sum()))
-    graphnode_moverz, graphnode_feature = graphnode_moverz[mask[0]], graphnode_feature[mask[0]]
-
-    #######
-    #点等价性筛选
-    equivalent_graphnode_mask = graphnode_equivalence_filter(start_edge_type, end_edge_type, graphnode_moverz)
-    start_edge_type = start_edge_type[equivalent_graphnode_mask].reshape((equivalent_graphnode_mask[0].sum(),
-                                                                          equivalent_graphnode_mask[0].sum()))
-    end_edge_type = end_edge_type[equivalent_graphnode_mask].reshape((equivalent_graphnode_mask[0].sum(),
-                                                                      equivalent_graphnode_mask[0].sum()))
-    mass_difference = mass_difference[equivalent_graphnode_mask].reshape((equivalent_graphnode_mask[0].sum(),
-                                                                          equivalent_graphnode_mask[0].sum()))
-    graphnode_moverz, graphnode_feature = graphnode_moverz[equivalent_graphnode_mask[0]], graphnode_feature[equivalent_graphnode_mask[0]]
-    #######
-    #边信息构建
-    n = graphnode_moverz.size
-    subedge_maxnum = np.max(end_edge_type-start_edge_type)
-    edge_matrix, edge_rdifferent_matrix = edge_matrix_generator(n,
-                                                                subedge_maxnum,
-                                                                theo_edge_mass,
-                                                                mass_difference,
-                                                                start_edge_type,
-                                                                end_edge_type)
-
-    adjacency_matrix = ((end_edge_type-start_edge_type)>0).astype(int)
-    dist_matrix, predecessors = typological_sort_floyd_warshall(n, adjacency_matrix)
-
-    max_dist = dist_matrix.max()
-    path_matrix, path_rdifferent_matrix = gen_edge_input(n,
-                                                         max_dist,
-                                                         subedge_maxnum,
-                                                         predecessors,
-                                                         edge_matrix,
-                                                         edge_rdifferent_matrix,
-                                                         adjacency_matrix)
-
-    path_mask = dist_matrix>0+np.identity(n,dtype=bool)
-
-    return dist_matrix, edge_matrix, edge_rdifferent_matrix, path_mask, path_matrix, path_rdifferent_matrix, adjacency_matrix, graphnode_moverz, graphnode_feature
-
-def path_label_generator(seq, graphnode_moverz):
-    start_index = graphnode_moverz.searchsorted(Residual_seq(seq).step_mass[:-1]-0.02)
-    end_index = graphnode_moverz.searchsorted(Residual_seq(seq).step_mass[:-1]+0.02)
-    if np.prod((end_index-start_index)[(end_index-start_index)>1])<200:
-        temp_node_position = [[0]]
-        for i in range(len(seq)-1):
-            temp_node_position.append([node for node in range(start_index[i],end_index[i])])
-        temp_node_position.append([graphnode_moverz.size-1])
-        possible_node_path = []
-        for i in product(*temp_node_position):
-            possible_node_path.append(np.array(i))
-        possible_node_path = np.array(possible_node_path)
-        return possible_node_path
-    else:
-        return np.array([])
-
-def seq_label_generator(aa_dict, seq):
-    seq_label = np.array([aa_dict[aa] for aa in seq])
-    return seq_label
+graph_gen = GraphGenerator(candidate_mass,all_edge_mass)
 
 if __name__=='__main__':
-    context = zmq.Context()
-    receive = context.socket(zmq.PULL)
-    receive.connect('tcp://127.0.0.1:5557')
-
-
-    #experiment_name = 'Plasma'
-    data_acquisition_upper_limit = 3500
-    #psm_head = pd.read_csv('./data/{}/{}_PSMs.csv'.format(experiment_name,experiment_name))
-    theo_ion_moverz = np.load('possible_ion_moverz')
-    theo_graphnode_moverz = np.load('possible_graphnode_moverz')
-    
-    theo_edge_mass = []
-    aalist = Residual_seq.output_aalist()
-    for num in range(1,3):
-        for i in combinations_with_replacement(aalist,num):
-            theo_edge_mass.append(Residual_seq(i).mass)
-    theo_edge_mass = np.array(sorted(set([float(-100)]+theo_edge_mass+[float("inf")])))
-    
-    aa_dict = {aa:i for i, aa in enumerate(Residual_seq._Residual_seq__aa_residual_composition,start=1)}
-
-    #for _, (file_id, scan) in tqdm(psm_head[['File ID','Scan']].iterrows()):
-    while True:
-        data = receive.recv_json()
-        experiment_name, file_id, scan = data['experiment_name'], data['file_id'], data['scan']
-        with open('./data/{}/{}/{}.ms2'.format(experiment_name, file_id, scan),'rb') as f:
-            #data load
-            ms2_spectrum = pickle.load(f)
-            seq = ms2_spectrum['seq']
-            seq = seq.replace('L','I')
-            precursor_ion_moverz,precursor_ion_charge = ms2_spectrum['precursor_ion_moverz'],ms2_spectrum['precursor_ion_charge']
-            product_ions_moverz, product_ions_intensity = np.array(ms2_spectrum['product_ions_moverz']), np.array(ms2_spectrum['product_ions_intensity'])
-
-            #graph vertices generation
-            muti_charged = precursor_ion_charge>2
-            if spec_verification(seq,product_ions_moverz,muti_charged): continue
-            product_ions_feature = feature_genrator(product_ions_moverz, product_ions_intensity, data_acquisition_upper_limit)
-            #product_ions_moverz, product_ions_feature = record_filter(theo_ion_moverz, product_ions_moverz, product_ions_feature, 'ion')
-            graphnode_moverz, graphnode_feature = graphnode_generator(theo_ion_moverz, theo_graphnode_moverz, precursor_ion_moverz, precursor_ion_charge, product_ions_moverz, product_ions_feature, muti_charged)
-            if graph_verification(seq, graphnode_moverz): continue
-            if graphnode_moverz.size>1024: continue
-            dist_matrix, edge_matrix, edge_rdifferent_matrix, path_mask, path_matrix, path_rdifferent_matrix, adjacency_matrix, graphnode_moverz, graphnode_feature = edge_generator(theo_edge_mass, graphnode_moverz, graphnode_feature)
-            path_label = path_label_generator(seq, graphnode_moverz)
-            seq_label = seq_label_generator(aa_dict, seq)
-            np.savez_compressed('/home/z37mao/genova/pretrain_data/{}/{}/{}'.format(experiment_name, file_id, scan),
-                                graphnode_moverz=graphnode_moverz,
-                                graphnode_feature=graphnode_feature,
-                                edge_matrix=edge_matrix,
-                                edge_rdifferent_matrix=edge_rdifferent_matrix,
-                                path_mask=path_mask,
-                                path_matrix=path_matrix,
-                                path_rdifferent_matrix=path_rdifferent_matrix,
-                                adjacency_matrix=adjacency_matrix,
-                                path_label=path_label,
-                                seq_label=seq_label)
+    worker, start_i, end_i = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
+    psm_head = psm_head.iloc[start_i:end_i]
+    with open('/home/z37mao/genova_data/{}.csv'.format(worker), 'w') as index_writer:
+        index_writer.write('Spec Index,Node Number,Relation Num,Edge Num,MSGP File Name,MSGP Datablock Pointer,MSGP Datablock Length\n')
+        for i, (spec_index, (experiment_name, seq, precursor_charge, precursor_moverz, pointer, data_len)) in enumerate(psm_head[['MGFS Experiment Name','Annotated Sequence','Charge','m/z [Da]','MGFS_Datablock_Pointer','MGFS_Datablock_Length']].iterrows()):
+            file_num = i//4000
+            if i%4000==0:
+                try: writer.close()
+                except: pass 
+                writer = open('/home/z37mao/genova_data/{}_{}.msgp'.format(worker, file_num),'wb')
+            with open('/data/z37mao/genova_new/{}.mgfs'.format(experiment_name),'rb') as f:
+                f.seek(pointer)
+                seq = seq.replace('L','I')
+                product_ion_info = pickle.loads(f.read(data_len))
+                precursor_ion_mass = Ion.precursorion2mass(precursor_moverz, precursor_charge)
+                product_ions_moverz, product_ions_intensity = product_ion_info['product_ions_moverz'], product_ion_info['product_ions_intensity']
+                node_mass, node_input, rel_input, edge_input, graph_label = graph_gen(product_ions_moverz, product_ions_intensity, precursor_ion_mass, precursor_charge>2)
+                record = {'node_mass':node_mass,
+                          'node_input':node_input, 
+                          'rel_input':rel_input, 
+                          'edge_input':edge_input, 
+                          'graph_label':graph_label}
+                compressed_data = gzip.compress(pickle.dumps(record))
+                index_writer.write('{},{},{},{},{},{},{}\n'.format(spec_index,node_mass.size,len(rel_input['rel_type']),len(edge_input['edge_type']),"{}_{}.msgp".format(worker, file_num),writer.tell(),len(compressed_data)))
+                writer.write(compressed_data)
+                

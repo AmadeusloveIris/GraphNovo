@@ -29,7 +29,7 @@ class EdgeEncoder(nn.Module):
         assert expansion_factor >= 4 #Pointnet放大乘数不因小于最后一次mlp
 
         self.edge_type_embed = nn.Embedding(edge_type_num, d_edge_type, padding_idx=0)
-        self.edge_pos_embed = nn.Embedding(path_max_length, d_edge, padding_idx=0)
+        self.edge_pos_embed = nn.Embedding(path_max_length, d_edge)
         self.dist_embed = nn.Embedding(path_max_length, d_edge_extanded, padding_idx=0)
         self.mlp = nn.Sequential(nn.Linear(d_edge, d_edge*2),
                                  nn.ReLU(inplace=True),
@@ -67,7 +67,6 @@ class EdgeEncoder(nn.Module):
             rel_coor_cated (torch.IntTensor): coordinates of those data (Because we use Hybrid COO to store sparse tensor)
             batch_num (int): batch_num
             max_node (int): max_node in batch of graph
-            rel_mask (torch.BoolTensor): [description]
 
         Returns:
             relation (Tensor): Bias of Attention Matrix in Transformer
@@ -76,8 +75,6 @@ class EdgeEncoder(nn.Module):
         edge_pos = self.edge_pos_embed(edge_pos)
         dist = self.dist_embed(dist)
         rel_type = torch.concat([rel_type, rel_error],dim=1).add_(edge_pos)
-        #rel_type = checkpoint_sequential(self.mlp,3,rel_type)
-        #path = checkpoint(self.edge_maxpool,rel_type,rel_coor_cated,max_node,batch_num)
         rel_type = self.mlp(rel_type)
         relation = torch_sparse.SparseTensor(row=rel_coor_cated[0],
                                             col=rel_coor_cated[1],

@@ -26,6 +26,7 @@ class Composition():
             self.composition = class_input
         else:
             raise TypeError
+        self.mass = self.mass_calculater()
 
     def __add__(self, other):
         result = {}
@@ -145,6 +146,14 @@ class Residual_seq():
     def output_aalist(cls):
         return list(cls.__aa_residual_composition.keys())
 
+    @classmethod
+    def output_aadict(cls):
+        return cls.__aa_residual_composition
+
+    @classmethod
+    def seqs2composition_list(cls,seq):
+        return [cls.__aa_residual_composition[aa] for aa in seq]
+
 class Ion():
     __ion_offset = {
         'a': Composition('-CHO'),
@@ -231,95 +240,3 @@ class Ion():
     @classmethod
     def output_ions(cls):
         return list(cls.__ion_offset.keys())
-
-def Mgfreader(filepath,train_label=None):
-    with open(filepath) as f:
-        for line in f:
-            if "BEGIN" in line:
-                data_line = f.readline()
-                mz_array = []
-                intensity_array = []
-                while data_line != 'END IONS\n':
-                    if "PEPMASS" in data_line:
-                        pepmass = float(data_line[8:-1])
-                    elif "CHARGE" in data_line:
-                        charge = int(data_line[7])
-                    elif "SCANS" in data_line:
-                        scans = data_line[6:-1]
-                    elif "SEQ" in data_line:
-                        seqs = data_line[4:-1]
-                        seq = []
-                        for char in seqs:
-                            if char.isupper(): seq.append(char)
-                            else: seq[-1] += char
-                        for i, aa in enumerate(seq):
-                            if aa=='N(+.98)': seq[i]='D'
-                            elif aa=='Q(+.98)': seq[i]='E'
-                            elif aa=='L': seq[i]='I'
-                    elif data_line[0].isnumeric():
-                        mz, intensity = data_line.strip().split()
-                        mz_array.append(float(mz))
-                        intensity_array.append(float(intensity))
-                    data_line = f.readline()
-
-                if train_label is not None:
-                    try: 
-                        seqs = train_label['seq'].loc[scans]
-                        seq = []
-                        for char in seqs:
-                            if char.isupper(): seq.append(char)
-                            else: seq[-1] += char
-                        for i, aa in enumerate(seq):
-                            if aa=='N(+.98)': seq[i]='D'
-                            elif aa=='Q(+.98)': seq[i]='E'
-                            elif aa=='L': seq[i]='I'
-                    except: continue
-                    pepmass = train_label['m/z'].loc[scans]
-                    charge = train_label['z'].loc[scans]
-                spectrum_datablock = {
-                    'pepmass': pepmass,
-                    'scan_id': scans,
-                    'charge': charge,
-                    'seq': seq,
-                    'mz_array': np.array(mz_array),
-                    'intensity_array': np.array(intensity_array)
-                }
-                yield spectrum_datablock
-
-def Mgfaltreader(filepath):
-    with open(filepath) as f:
-        for line in f:
-            if "BEGIN" in line:
-                data_line = f.readline()
-                peakrow = []
-                while data_line != 'END IONS\n':
-                    if "PEPMASS" in data_line:
-                        pepmass = float(data_line[8:-1])
-                    elif "CHARGE" in data_line:
-                        charge = int(data_line[7])
-                    elif "SCANS" in data_line:
-                        scans = data_line[6:-1]
-                    elif "SEQ" in data_line:
-                        seqs = data_line[4:-1]
-                        seq = []
-                        for char in seqs:
-                            if char.isupper(): seq.append(char)
-                            else: seq[-1] += char
-                        for i, aa in enumerate(seq):
-                            if aa=='N(+.98)': seq[i]='D'
-                            elif aa=='Q(+.98)': seq[i]='E'
-                            elif aa=='L': seq[i]='I'
-                    elif "SMZ_EXIST" in data_line:
-                        smz = data_line[10:-1]
-                    elif data_line[0].isnumeric():
-                        peakrow.append(np.array(data_line.strip().split(),dtype=np.float))
-                    data_line = f.readline()
-
-                spectrum_datablock = {
-                    'pepmass': pepmass,
-                    'charge': charge,
-                    'seq': seq,
-                    'smz': smz,
-                    'peak_row': np.array(peakrow)
-                }
-                yield spectrum_datablock

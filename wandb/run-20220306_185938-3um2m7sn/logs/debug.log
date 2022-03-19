@@ -22,3 +22,109 @@ config: {}
 2022-03-06 18:59:43,776 INFO    MainThread:2800943 [wandb_run.py:_redirect():1611] Redirecting console.
 2022-03-06 18:59:43,778 INFO    MainThread:2800943 [wandb_run.py:_redirect():1667] Redirects installed.
 2022-03-06 18:59:43,778 INFO    MainThread:2800943 [wandb_init.py:init():664] run started, returning control to user process
+2022-03-07 20:39:21,996 INFO    MainThread:2800943 [wandb_run.py:_atexit_cleanup():1702] got exitcode: 255
+2022-03-07 20:39:21,998 INFO    MainThread:2800943 [wandb_run.py:_restore():1674] restore
+2022-03-07 20:39:24,679 INFO    MainThread:2800943 [wandb_run.py:_on_finish():1831] got exit ret: file_counts {
+  wandb_count: 1
+}
+pusher_stats {
+  uploaded_bytes: 794
+  total_bytes: 794
+}
+
+2022-03-07 20:39:24,788 INFO    MainThread:2800943 [wandb_run.py:_on_finish():1831] got exit ret: file_counts {
+  wandb_count: 1
+}
+pusher_stats {
+  uploaded_bytes: 794
+  total_bytes: 794
+}
+
+2022-03-07 20:39:24,912 INFO    MainThread:2800943 [wandb_run.py:_on_finish():1831] got exit ret: file_counts {
+  wandb_count: 1
+}
+pusher_stats {
+  uploaded_bytes: 794
+  total_bytes: 794
+}
+
+2022-03-07 20:39:25,394 INFO    MainThread:2800943 [wandb_run.py:_on_finish():1831] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 794
+  total_bytes: 9680
+}
+
+2022-03-07 20:39:25,496 INFO    MainThread:2800943 [wandb_run.py:_on_finish():1831] got exit ret: file_counts {
+  wandb_count: 6
+}
+pusher_stats {
+  uploaded_bytes: 794
+  total_bytes: 9895
+}
+
+2022-03-07 20:39:25,599 INFO    MainThread:2800943 [wandb_run.py:_on_finish():1831] got exit ret: file_counts {
+  wandb_count: 6
+}
+pusher_stats {
+  uploaded_bytes: 9895
+  total_bytes: 9895
+}
+
+2022-03-07 20:39:25,701 INFO    MainThread:2800943 [wandb_run.py:_on_finish():1831] got exit ret: file_counts {
+  wandb_count: 6
+}
+pusher_stats {
+  uploaded_bytes: 9895
+  total_bytes: 9895
+}
+
+2022-03-07 20:39:25,803 INFO    MainThread:2800943 [wandb_run.py:_on_finish():1831] got exit ret: file_counts {
+  wandb_count: 6
+}
+pusher_stats {
+  uploaded_bytes: 9895
+  total_bytes: 9895
+}
+
+2022-03-07 20:39:25,906 INFO    MainThread:2800943 [wandb_run.py:_on_finish():1831] got exit ret: file_counts {
+  wandb_count: 6
+}
+pusher_stats {
+  uploaded_bytes: 9895
+  total_bytes: 9895
+}
+
+2022-03-07 20:39:26,008 INFO    MainThread:2800943 [wandb_run.py:_on_finish():1831] got exit ret: file_counts {
+  wandb_count: 6
+}
+pusher_stats {
+  uploaded_bytes: 9895
+  total_bytes: 9895
+}
+
+2022-03-07 20:39:26,229 INFO    MainThread:2800943 [wandb_run.py:_on_finish():1831] got exit ret: file_counts {
+  wandb_count: 6
+}
+pusher_stats {
+  uploaded_bytes: 9895
+  total_bytes: 9895
+}
+
+2022-03-07 20:39:26,465 INFO    MainThread:2800943 [wandb_run.py:_on_finish():1831] got exit ret: done: true
+exit_result {
+}
+file_counts {
+  wandb_count: 6
+}
+pusher_stats {
+  uploaded_bytes: 9895
+  total_bytes: 9895
+}
+local_info {
+}
+
+2022-03-07 20:39:28,146 INFO    MainThread:2800943 [wandb_run.py:_footer_history_summary_info():2865] rendering history
+2022-03-07 20:39:28,147 INFO    MainThread:2800943 [wandb_run.py:_footer_history_summary_info():2894] rendering summary
+2022-03-07 20:39:28,148 INFO    MainThread:2800943 [wandb_run.py:_footer_sync_info():2822] logging synced files

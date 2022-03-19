@@ -1,4 +1,3 @@
-import math
 import torch
 import torch.nn as nn
 
@@ -7,7 +6,8 @@ class Relation(nn.Module):
                  hidden_size: int,
                  d_relation: int,
                  num_head: int,
-                 layer_num: int):
+                 encoder_layer_num: int, 
+                 decoder_layer_num: int):
         """_summary_
 
         Args:
@@ -31,6 +31,9 @@ class Relation(nn.Module):
         self.linear_k = nn.Linear(hidden_size, self.d_relation)
         self.linear_v = nn.Linear(hidden_size, hidden_size)
         
+        nn.init.xavier_uniform_(self.linear_q.weight, gain=2**-0.5)
+        nn.init.xavier_uniform_(self.linear_k.weight, gain=2**-0.5)
+
         self.relation_mlp = nn.Sequential(nn.LayerNorm(self.d_relation),
                                           #nn.Linear(self.d_relation, self.d_relation*2),
                                           #nn.ReLU(inplace=True),
@@ -52,7 +55,8 @@ class Relation(nn.Module):
         self.output_layer = nn.Sequential(nn.LayerNorm(hidden_size),
                                           nn.Linear(hidden_size, hidden_size)
                                           )
-        nn.init.xavier_uniform_(self.output_layer[-1].weight, gain=(4*layer_num)**-0.25)
+                                          
+        nn.init.xavier_uniform_(self.output_layer[-1].weight, gain=encoder_layer_num**-0.25 * decoder_layer_num**-0.0625)
 
     def forward(self, node, edge, drctn, rel_mask):
         """_summary_
@@ -91,13 +95,17 @@ class Relation(nn.Module):
         node = node.view(batch_size, -1, self.hidden_size)
         node = self.output_layer(node)
         return node
+
 class GenovaEncoderLayer(nn.Module):
     def __init__(self, hidden_size: int, 
     ffn_hidden_size: int, d_relation: int, 
-    num_head: int, layer_num: int):
+    num_head: int, encoder_layer_num: int, 
+    decoder_layer_num: int):
 
         super().__init__()
-        self.relation = Relation(hidden_size, d_relation, num_head, layer_num)
+        if decoder_layer_num<1: decoder_layer_num = 1
+        if encoder_layer_num<1: encoder_layer_num = 1
+        self.relation = Relation(hidden_size, d_relation, num_head, encoder_layer_num, decoder_layer_num)
         self.ffn = nn.Sequential(nn.ReLU(inplace=True),
                                  nn.LayerNorm(hidden_size),
                                  nn.Linear(hidden_size, ffn_hidden_size),
@@ -105,7 +113,7 @@ class GenovaEncoderLayer(nn.Module):
                                  nn.LayerNorm(ffn_hidden_size),
                                  nn.Linear(ffn_hidden_size, hidden_size)
                                  )
-        nn.init.xavier_uniform_(self.ffn[-1].weight, gain=(4*layer_num)**0.25)
+        nn.init.xavier_uniform_(self.ffn[-1].weight, gain=encoder_layer_num**-0.25 * decoder_layer_num**-0.0625)
 
     def forward(self, node, edge, **kwarg):
         node = node + self.relation(node, edge, **kwarg)

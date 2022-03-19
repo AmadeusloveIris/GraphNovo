@@ -6,6 +6,7 @@ from libc.stdlib cimport malloc, free
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def edge_matrix_generator(long n, 
+                          double mass_threshold,
                           long subedge_maxnum,
                           double[::1] theo_edge_mass,
                           double[:,::1] mass_difference,
@@ -23,8 +24,8 @@ def edge_matrix_generator(long n,
         for j in range(n):
             for k in range(end_edge_type[i,j]-start_edge_type[i,j]):
                 edge = start_edge_type[i,j]+k
-                edge_type_matrix_view[i,j,k] = edge
-                edge_different_matrix_view[i,j,k] = exp(-fabs(theo_edge_mass[edge]-mass_difference[i,j])/0.04)
+                edge_type_matrix_view[i,j,k] = edge + 1
+                edge_different_matrix_view[i,j,k] = exp(-fabs(theo_edge_mass[edge]-mass_difference[i,j])/mass_threshold)
     return edge_type_matrix, edge_different_matrix
 
 @cython.boundscheck(False)
