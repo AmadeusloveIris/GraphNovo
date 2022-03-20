@@ -13,8 +13,15 @@ class GenovaEncoder(nn.Module):
                                         expansion_factor = cfg.encoder.node_encoder.expansion_factor,
                                         hidden_size = cfg.hidden_size)
 
-        self.edge_encoder = EdgeEncoder(edge_type_num = cfg.preprocessing.edge_type_num, 
+        self.path_encoder = EdgeEncoder(edge_type_num = cfg.preprocessing.edge_type_num, 
                                         path_max_length = cfg.preprocessing.path_max_length, 
+                                        d_ori_edge = cfg.preprocessing.d_ori_edge,
+                                        d_edge = cfg.encoder.path_encoder.d_edge,
+                                        expansion_factor = cfg.encoder.path_encoder.expansion_factor,
+                                        d_relation = cfg.encoder.d_relation,
+                                        )
+        
+        self.edge_encoder = EdgeEncoder(edge_type_num = cfg.preprocessing.edge_type_num,
                                         d_ori_edge = cfg.preprocessing.d_ori_edge,
                                         d_edge = cfg.encoder.edge_encoder.d_edge,
                                         expansion_factor = cfg.encoder.edge_encoder.expansion_factor,
@@ -25,7 +32,8 @@ class GenovaEncoder(nn.Module):
                                                                        ffn_hidden_size = cfg.encoder.relation.ffn_hidden_size,
                                                                        num_head = cfg.encoder.relation.num_heads,
                                                                        d_relation = cfg.encoder.d_relation,
-                                                                       layer_num = cfg.encoder.num_layers)]*cfg.encoder.num_layers)
+                                                                       encoder_layer_num = cfg.encoder.num_layers,
+                                                                       decoder_layer_num = cfg.decoder.num_layers)]*cfg.encoder.num_layers)
         
         self.bin_classification = bin_classification
         if self.bin_classification: 
@@ -40,13 +48,14 @@ class GenovaEncoder(nn.Module):
                                             )
             
 
-    def forward(self,node_input, edge_input, rel_input):
+    def forward(self, node_input, path_input, edge_input, rel_mask):
         
         node = self.node_encoder(**node_input)
         edge = self.edge_encoder(**edge_input)
+        path = self.path_encoder(**path_input)
         
         for genova_encoder_layer in self.genova_encoder_layers:
-            node = genova_encoder_layer(node, edge, **rel_input)
+            node = genova_encoder_layer(node, edge, path, rel_mask)
         
         if self.bin_classification:
             node = self.output_ffn(node)

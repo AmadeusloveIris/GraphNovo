@@ -30,9 +30,13 @@ class Relation(nn.Module):
         self.linear_q = nn.Linear(hidden_size, self.d_relation)
         self.linear_k = nn.Linear(hidden_size, self.d_relation)
         self.linear_v = nn.Linear(hidden_size, hidden_size)
-        
+        self.linear_edge = nn.Linear(self.d_relation, self.d_relation)
+        self.linear_path = nn.Linear(self.d_relation, self.d_relation)
+
         nn.init.xavier_uniform_(self.linear_q.weight, gain=2**-0.5)
         nn.init.xavier_uniform_(self.linear_k.weight, gain=2**-0.5)
+        nn.init.xavier_uniform_(self.linear_edge.weight, gain=2**-0.5)
+        nn.init.xavier_uniform_(self.linear_path.weight, gain=2**-0.5)
 
         self.relation_mlp = nn.Sequential(nn.LayerNorm(self.d_relation),
                                           #nn.Linear(self.d_relation, self.d_relation*2),
@@ -40,7 +44,7 @@ class Relation(nn.Module):
                                           #nn.LayerNorm(self.d_relation*2),
                                           #nn.Linear(self.d_relation*2, self.d_relation),
                                           #nn.ReLU(inplace=True),
-                                          #LayerNorm_out(self.d_relation),
+                                          #nn.LayerNorm(self.d_relation),
                                           #nn.Linear(self.d_relation, num_head)
                                           nn.Linear(self.d_relation, self.d_relation//2),
                                           nn.ReLU(inplace=True),
@@ -50,15 +54,14 @@ class Relation(nn.Module):
                                           nn.LayerNorm(self.d_relation//4),
                                           nn.Linear(self.d_relation//4, num_head)
                                          )
-        
-        self.direction_embedding = nn.Embedding(3, self.d_relation) #forward(1), backward(2) and no direction(0)
+                                         
         self.output_layer = nn.Sequential(nn.LayerNorm(hidden_size),
                                           nn.Linear(hidden_size, hidden_size)
                                           )
                                           
         nn.init.xavier_uniform_(self.output_layer[-1].weight, gain=encoder_layer_num**-0.25 * decoder_layer_num**-0.0625)
 
-    def forward(self, node, edge, drctn, rel_mask):
+    def forward(self, node, edge, path, rel_mask):
         """_summary_
 
         Args:
@@ -82,8 +85,8 @@ class Relation(nn.Module):
         node_v = node_v.transpose(1, 2)   # [b, h, len, d_v]
 
         # Scaled Dot-Product Attention.
-        relation = torch.matmul(node_q, node_k)                                       # [b, d_srel, q_len, k_len]
-        relation = relation.permute(0,2,3,1) + edge + self.direction_embedding(drctn) # [b, q_len, k_len, d_srel]
+        relation = torch.matmul(node_q, node_k)                                                 # [b, d_srel, q_len, k_len]
+        relation = relation.permute(0,2,3,1) + self.linear_edge(edge) + self.linear_path(path)  # [b, q_len, k_len, d_srel]
         relation = self.relation_mlp(relation)
         
         relation += rel_mask
@@ -91,8 +94,7 @@ class Relation(nn.Module):
         relation = relation.permute(0,3,1,2)                        # [b, n_heads, q_len, k_len]
         
         node = torch.matmul(relation, node_v)
-        node = node.transpose(1,2).contiguous()
-        node = node.view(batch_size, -1, self.hidden_size)
+        node = node.transpose(1,2).reshape(batch_size, -1, self.hidden_size)
         node = self.output_layer(node)
         return node
 
@@ -115,7 +117,7 @@ class GenovaEncoderLayer(nn.Module):
                                  )
         nn.init.xavier_uniform_(self.ffn[-1].weight, gain=encoder_layer_num**-0.25 * decoder_layer_num**-0.0625)
 
-    def forward(self, node, edge, **kwarg):
-        node = node + self.relation(node, edge, **kwarg)
+    def forward(self, node, edge, path, rel_mask):
+        node = node + self.relation(node, edge, path, rel_mask)
         node = node + self.ffn(node)
         return node
