@@ -1,2 +1,2 @@
-from .collator import GenovaCollator
-from .dataset import GenovaDataset
+from .collator_old import GenovaCollator
+from .dataset_old import GenovaDataset
