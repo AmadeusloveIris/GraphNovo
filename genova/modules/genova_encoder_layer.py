@@ -88,7 +88,6 @@ class Relation(nn.Module):
         relation = torch.matmul(node_q, node_k)                                                 # [b, d_srel, q_len, k_len]
         relation = relation.permute(0,2,3,1) + self.linear_edge(edge) + self.linear_path(path)  # [b, q_len, k_len, d_srel]
         relation = self.relation_mlp(relation)
-        
         relation += rel_mask
         relation = relation.softmax(dim=2)                          # [b, q_len, k_len, n_heads]
         relation = relation.permute(0,3,1,2)                        # [b, n_heads, q_len, k_len]

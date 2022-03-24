@@ -4,7 +4,7 @@ preprocessing:
   max_subion_num: 25
   d_ori_node: 10
   d_ori_edge: 1
-  edge_type_num: 215
+  edge_type_num: 50150
   path_max_length: 100
 
 encoder:
@@ -27,7 +27,7 @@ decoder:
   dictlen: 30
   max_seq_len: 100
   num_heads: 8
-  num_layers: 6
+  num_layers: 0
 
 dataset:
   use_path_label: False

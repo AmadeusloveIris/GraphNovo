@@ -3,131 +3,85 @@ import numpy as np
 from torch.nn.functional import pad
 
 class GenovaCollator(object):
-    def __init__(self,cfg,*,mode):
+    def __init__(self, cfg):
         self.cfg = cfg
-        self.mode = mode
+
+    def __call__(self, batch):
+        node_inputs = [record['node_input'] for record in batch]
+        path_inputs = [record['rel_input'] for record in batch]
+        edge_inputs = [record['edge_input'] for record in batch]
+        node_labels = [record['graph_label'] for record in batch]
         
-    def __call__(self,batch):
-        encoder_records = [record[0] for record in batch]
-        encoder_input, node_mask = self.encoder_collate(encoder_records)
-        if self.mode == 'train':
-            if self.cfg.dataset.use_path_label:
-                decoder_records = [record[1] for record in batch]
-                labels = [record[2] for record in batch]
-                labels = self.path_label_pad(labels)
-                decoder_input = self.decoder_collate_path(decoder_records)
-                decoder_input['memory_key_padding_mask'] = node_mask
-                return encoder_input, decoder_input, labels 
-            else:
-                seqs = [record[1] for record in batch]
-                tf_labels, labels = self.seq_pad(seqs)
-                decoder_input = {}
-                decoder_input['tgt_index'] = tf_labels
-                decoder_input['memory_key_padding_mask'] = node_mask
-                decoder_input['tgt_mask'] = torch.triu(torch.full((tf_labels.shape[1], tf_labels.shape[1]), float('-inf')), diagonal=1)
-                return encoder_input, decoder_input, labels
-        else:
-            if self.cfg.dataset.use_path_label:
-                raise NotImplementedError
-            else:
-                seqs = [record[1] for record in batch]
-                tf_labels, labels = self.seq_pad(seqs)
-                decoder_input = {}
-                decoder_input['tgt_index'] = tf_labels
-                decoder_input['memory_key_padding_mask'] = node_mask
-                return encoder_input, node_mask, labels
-        
-    def encoder_collate(self, encoder_records):
-        node_shape = []
-        for record in encoder_records: node_shape.append(np.array(record['node_sourceion'].shape))
-        node_shape = np.array(node_shape).T
+        node_shape = np.array([node_input['node_sourceion'].shape for node_input in node_inputs]).T
         max_node = node_shape[0].max()
         max_subgraph_node = node_shape[1].max()
+        batch_num = len(batch)
+        
+        node_input = self.node_collate(node_inputs, max_node, max_subgraph_node)
+        path_input = self.path_collate(path_inputs, max_node, node_shape)
+        edge_input = self.edge_collate(edge_inputs, max_node)
+        rel_mask = self.rel_collate(node_shape, max_node)
+        node_labels, node_mask = self.nodelabel_collate(node_labels, max_node)
+        
+        encoder_input = {'node_input':node_input,'path_input':path_input,
+                         'edge_input':edge_input,'rel_mask':rel_mask}
+        labels = {'node_labels':node_labels, 'node_mask':node_mask}
+        
+        return encoder_input, labels
 
-        node_input = {}
-        edge_input = {}
-        rel_input = {}
-
-        edge_input['rel_type'] = torch.concat([record['rel_type'] for record in encoder_records])
-        edge_input['edge_pos'] = torch.concat([record['edge_pos'] for record in encoder_records])
-        edge_input['rel_error'] = torch.concat([record['rel_error'] for record in encoder_records]).unsqueeze(-1)
-
-
+    def node_collate(self, node_inputs, max_node, max_subgraph_node):
         node_feat = []
         node_sourceion = []
-        rel_mask = []
-        dist = []
-        charge = []
-        rel_coor_cated = []
-        node_mask = torch.zeros(len(encoder_records),max_node,dtype=bool)
-        for i, record in enumerate(encoder_records):
-            node_num, node_subgraph_node = record['node_sourceion'].shape
-            node_feat.append(pad(record['node_feat'],[0,0,0,max_subgraph_node-node_subgraph_node,0,max_node-node_num]))
-            node_sourceion.append(pad(record['node_sourceion'],[0,max_subgraph_node-node_subgraph_node,0,max_node-node_num]))
-            rel_mask.append(pad(pad(record['rel_mask'],[0,max_node-node_num],value=-float('inf')),[0,0,0,max_node-node_num]))
-            dist.append(pad(record['dist'],[0,max_node-node_num,0,max_node-node_num]))
-            charge.append(record['charge'])
-            rel_coor_cated.append(torch.stack([i*max_node**2+record['rel_coor'][0]*max_node+record['rel_coor'][1],
-                                               record['rel_coor'][-2]*100+record['rel_coor'][-1]]))
-            node_mask[i,node_num:] = True
-
-        drctn = torch.zeros(max_node,max_node)+torch.tril(2*torch.ones(max_node,max_node),-1)+torch.triu(torch.ones(max_node,max_node),1)
-        rel_input['drctn'] = drctn.int().unsqueeze(0)
-        node_input['node_feat'] = torch.stack(node_feat)
-        node_input['node_sourceion'] = torch.stack(node_sourceion)
-        rel_input['rel_mask'] = torch.stack(rel_mask).unsqueeze(-1)
-        edge_input['dist'] = torch.stack(dist)
-        node_input['charge'] = torch.IntTensor(charge)
-        edge_input['rel_coor_cated'] = torch.concat(rel_coor_cated,dim=1)
-        edge_input['batch_num'] = len(encoder_records)
-        edge_input['max_node'] = max_node
+        charge = torch.IntTensor([node_input['charge'] for node_input in node_inputs])
+        for node_input in node_inputs:
+            node_num, node_subgraph_node = node_input['node_sourceion'].shape
+            node_feat.append(pad(node_input['node_feat'], 
+                                 [0, 0, 0, max_subgraph_node - node_subgraph_node, 0, max_node - node_num]))
+            node_sourceion.append(pad(node_input['node_sourceion'], 
+                                      [0, max_subgraph_node - node_subgraph_node, 0, max_node - node_num]))
+        return {'node_feat':torch.stack(node_feat),'node_sourceion':torch.stack(node_sourceion),'charge':charge}
+    
+    def path_collate(self, path_inputs, max_node, node_shape):
+        rel_type = torch.concat([path_input['rel_type'] for path_input in path_inputs]).squeeze(-1)
+        rel_error = torch.concat([path_input['rel_error'] for path_input in path_inputs])
+        rel_coor = torch.concat([pad(path_input['rel_coor'],[1,0],value=i) for i, path_input in enumerate(path_inputs)]).T
+        rel_coor_cated = torch.stack([rel_coor[0]*max_node**2+rel_coor[1]*max_node+rel_coor[2],
+                                      rel_coor[-2]*self.cfg.preprocessing.edge_type_num+rel_coor[-1]])
         
-        encoder_input = {'node_input':node_input,'edge_input':edge_input,'rel_input':rel_input}
-
-        return encoder_input, node_mask
-
-    def decoder_collate_path(self, decoder_records):
-        decoder_input = {}
-        node_num = [record['edge_attn_mask'].size(1) for record in decoder_records]
-        max_node = max(node_num)
-        seq_len = [record['edge_attn_mask'].size(0) for record in decoder_records]
-        max_seq_len = max(seq_len)
-
-        decoder_input['edge_type'] = torch.concat([record['edge_type'] for record in decoder_records])
-        decoder_input['edge_error'] = torch.concat([record['edge_error'] for record in decoder_records]).unsqueeze(1)
-
-        edge_attn_mask = []
-        edge_label_mask = []
-        edge_coor_cated = []
-        path_label = []
-        for i, record in enumerate(decoder_records):
-            edge_coor_cated.append(torch.stack([i*max_node*max_seq_len+record['edge_coor'][0]*max_node+record['edge_coor'][1],
-                                                record['edge_coor'][-1]]))
-            edge_attn_mask.append(pad(pad(record['edge_attn_mask'],(0,max_node-node_num[i]),value=-float('inf')),(0,0,0,max_seq_len-seq_len[i])))
-            edge_label_mask.append(pad(pad(record['edge_label_mask'],(0,max_node-node_num[i]),value=-float('inf')),(0,0,0,max_seq_len-seq_len[i])))
-            path_label.append(pad(record['path_label'],(0,max_node-node_num[i],0,max_seq_len-seq_len[i])))
-            
-        decoder_input['max_node'] = max_node
-        decoder_input['max_seq_len'] = max_seq_len
-        decoder_input['edge_coor_cated'] = torch.concat(edge_coor_cated,dim=1)
-        decoder_input['edge_attn_mask'] = torch.stack(edge_attn_mask)
-        decoder_input['edge_label_mask'] = torch.stack(edge_label_mask)
-        decoder_input['path_label'] = torch.stack(path_label)
-        return decoder_input
-
-    def seq_pad(self, seqs):
-        seq_len = np.array([seq.size(0) for seq in seqs])-1
-        max_seq_len = max(seq_len)
-        tf_labels = torch.stack([pad(seq[:-1],(0,max_seq_len - seq_len[i])) for i, seq in enumerate(seqs)])
-        labels = torch.stack([pad(seq[1:],(0,max_seq_len - seq_len[i])) for i, seq in enumerate(seqs)])
-        return tf_labels, labels
-
-    def path_label_pad(self, path_labels):
-        node_num = [path_label.size(1) for path_label in path_labels]
-        max_node = max(node_num)
-        seq_len = [path_label.size(0) for path_label in path_labels]
-        max_seq_len = max(seq_len)
-
-        labels = torch.stack([pad(path_label,(0,max_node-node_num[i],0,
-                                  max_seq_len-seq_len[i])) for i, path_label in enumerate(path_labels)])
-        return labels
+        rel_pos = torch.concat([path_input['rel_coor'][:,-2] for path_input in path_inputs])
+        dist = torch.stack([pad(path_input['dist'],[0,max_node-node_shape[0,i],0,max_node-node_shape[0,i]]) for i, path_input in enumerate(path_inputs)])
+        
+        return {'rel_type':rel_type,'rel_error':rel_error,
+                'rel_pos':rel_pos,'dist':dist,
+                'rel_coor_cated':rel_coor_cated,
+                'max_node': max_node, 'batch_num': len(path_inputs)}
+        
+        
+    def edge_collate(self, edge_inputs, max_node):
+        rel_type = torch.concat([edge_input['edge_type'] for edge_input in edge_inputs]).squeeze(-1)
+        rel_error = torch.concat([edge_input['edge_error'] for edge_input in edge_inputs])
+        rel_coor = torch.concat([pad(edge_input['edge_coor'],[1,0],value=i) for i, edge_input in enumerate(edge_inputs)]).T
+        rel_coor_cated = torch.stack([rel_coor[0]*max_node**2+rel_coor[1]*max_node+rel_coor[2],
+                                      rel_coor[-1]])
+        
+        return {'rel_type':rel_type,'rel_error':rel_error,
+                'rel_coor_cated':rel_coor_cated, 
+                'max_node': max_node, 'batch_num': len(edge_inputs)}
+        
+    def rel_collate(self, node_shape, max_node):
+        rel_masks = []
+        for i in node_shape[0]:
+            rel_mask = -np.inf * torch.ones(max_node,max_node,1)
+            rel_mask[:,:i] = 0
+            rel_masks.append(rel_mask)
+        rel_masks = torch.stack(rel_masks)
+        return rel_masks
+    
+    def nodelabel_collate(self, node_labels_temp, max_node):
+        node_mask = torch.ones(len(node_labels_temp),max_node).bool()
+        node_labels = []
+        for i, node_label in enumerate(node_labels_temp):
+            node_mask[i, node_label.shape[0]:] = 0
+            node_labels.append(pad(node_label,[0,max_node-node_label.shape[0]]))
+        node_labels = torch.stack(node_labels)
+        return node_labels, node_mask

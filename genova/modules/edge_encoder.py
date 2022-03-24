@@ -23,30 +23,31 @@ class EdgeEncoder(nn.Module):
             d_edge_extanded: pointnet需要足够多的维度做maxpool，以避免信息丢失。这是设置放大维度的。
         """
         super().__init__()
+        self.edge_type_num = edge_type_num
         d_edge_type = d_edge - d_ori_edge
-        d_edge_extanded = d_edge * expansion_factor
+        self.d_edge_extanded = d_edge * expansion_factor
+        self.path_max_length = path_max_length
         assert d_edge % 8 == 0 #加速计算，如果是8的倍数速度可以更快.
         assert expansion_factor >= 4 #Pointnet放大乘数不因小于最后一次mlp
 
         self.edge_type_embed = nn.Embedding(edge_type_num, d_edge_type, padding_idx=0)
         if path_max_length:
             self.edge_pos_embed = nn.Embedding(path_max_length, d_edge)
-            self.dist_embed = nn.Embedding(path_max_length, d_edge_extanded, padding_idx=0)
+            self.dist_embed = nn.Embedding(path_max_length, self.d_edge_extanded, padding_idx=0)
             self.mlp = nn.Sequential(nn.Linear(d_edge, d_edge*2),
                                     nn.ReLU(inplace=True),
                                     nn.Linear(d_edge*2, d_edge*4),
                                     nn.ReLU(inplace=True),
-                                    nn.Linear(d_edge*4, d_edge_extanded)
+                                    nn.Linear(d_edge*4, self.d_edge_extanded)
                                     )
         else:
             self.mlp = nn.Sequential(nn.Linear(d_edge, d_edge*2),
                                     nn.ReLU(inplace=True),
-                                    nn.Linear(d_edge*2, d_edge_extanded)
+                                    nn.Linear(d_edge*2, self.d_edge_extanded)
                                     )
         
-        self.fc = nn.Sequential(nn.ReLU(inplace=True),
-                                nn.LayerNorm(d_edge_extanded),
-                                nn.Linear(d_edge_extanded, d_edge*4),
+        self.fc = nn.Sequential(nn.LayerNorm(self.d_edge_extanded),
+                                nn.Linear(self.d_edge_extanded, d_edge*4),
                                 nn.ReLU(inplace=True),
                                 nn.LayerNorm(d_edge*4),
                                 nn.Linear(d_edge*4, d_relation),
@@ -73,14 +74,22 @@ class EdgeEncoder(nn.Module):
         """
         rel_type = self.edge_type_embed(rel_type)
         relation = torch.concat([rel_type, rel_error],dim=1)
-        if rel_pos: relation = relation + self.edge_pos_embed(rel_pos)
+        if rel_pos!=None: relation = relation + self.edge_pos_embed(rel_pos)
         relation = self.mlp(relation)
-        relation = torch_sparse.SparseTensor(row=rel_coor_cated[0],
-                                            col=rel_coor_cated[1],
-                                            value=rel_type,
-                                            sparse_sizes=[batch_num*max_node*max_node,10000],
-                                            is_sorted=True)
+        if self.path_max_length:
+            relation = torch_sparse.SparseTensor(row=rel_coor_cated[0],
+                                                col=rel_coor_cated[1],
+                                                value=relation,
+                                                sparse_sizes=[batch_num*max_node*max_node,self.edge_type_num*self.d_edge_extanded*self.path_max_length],
+                                                is_sorted=True)
+        else:
+            relation = torch_sparse.SparseTensor(row=rel_coor_cated[0],
+                                                col=rel_coor_cated[1],
+                                                value=relation,
+                                                sparse_sizes=[batch_num*max_node*max_node,self.edge_type_num*self.d_edge_extanded],
+                                                is_sorted=True)
+                                                
         relation = torch_sparse.reduce.max(relation,dim=1).view(batch_num, max_node, max_node, -1)
-        if dist: relation = relation + self.dist_embed(dist)
+        if dist!=None: relation = relation + self.dist_embed(dist)
         relation = self.fc(relation)
         return relation
