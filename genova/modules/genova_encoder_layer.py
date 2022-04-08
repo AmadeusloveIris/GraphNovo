@@ -54,10 +54,6 @@ class Relation(nn.Module):
                                      )"""
 
         self.talking = nn.Linear(self.d_relation, self.d_relation)
-                                         
-        """self.output_layer = nn.Sequential(nn.LayerNorm(hidden_size),
-                                          nn.Linear(hidden_size, hidden_size)
-                                          )"""
 
         self.output_layer = nn.Linear(hidden_size, hidden_size)
         
@@ -109,14 +105,13 @@ class FFNGLU(nn.Module):
                                           nn.GELU()
                                           )
         self.pre_ffn = nn.Linear(hidden_size, 4*hidden_size)
+        self.ffnln = nn.LayerNorm(4*hidden_size)
         self.post_ffn = nn.Linear(4*hidden_size, hidden_size)
-        nn.init.xavier_normal_(self.pre_ffn.weight, gain=gain**0.5)
-        nn.init.xavier_normal_(self.pre_ffn_gate[0].weight, gain=gain**0.5)
         nn.init.xavier_normal_(self.post_ffn.weight, gain=gain)
 
     def forward(self, x):
         x = self.ln(x)
-        x = self.pre_ffn_gate(x)*self.pre_ffn(x)
+        x = self.ffnln(self.pre_ffn_gate(x)*self.pre_ffn(x))
         x = self.post_ffn(x)
         return x
 
@@ -130,12 +125,6 @@ class GenovaEncoderLayer(nn.Module):
         gain = encoder_layer_num**-0.5 * decoder_layer_num**-0.25
         
         self.relation = Relation(hidden_size, d_relation, num_head, gain)
-        
-        """self.ffn = nn.Sequential(nn.LayerNorm(hidden_size),
-                                 nn.Linear(hidden_size, hidden_size*4),
-                                 nn.GELU(),
-                                 nn.Linear(hidden_size*4, hidden_size)
-                                 )"""
 
         self.ffn = FFNGLU(hidden_size)
 
