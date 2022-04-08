@@ -6,8 +6,7 @@ class Relation(nn.Module):
                  hidden_size: int,
                  d_relation: int,
                  num_head: int,
-                 encoder_layer_num: int, 
-                 decoder_layer_num: int):
+                 gain: float):
         """_summary_
 
         Args:
@@ -33,33 +32,32 @@ class Relation(nn.Module):
         self.linear_edge = nn.Linear(self.d_relation, self.d_relation)
         self.linear_path = nn.Linear(self.d_relation, self.d_relation)
 
-        nn.init.xavier_uniform_(self.linear_q.weight, gain=2**-0.5)
-        nn.init.xavier_uniform_(self.linear_k.weight, gain=2**-0.5)
-        nn.init.xavier_uniform_(self.linear_edge.weight, gain=2**-0.5)
-        nn.init.xavier_uniform_(self.linear_path.weight, gain=2**-0.5)
+        """self.talking = nn.Sequential(#nn.Linear(self.d_relation, self.d_relation*2),
+                                     #nn.ReLU(inplace=True),
+                                     #nn.LayerNorm(self.d_relation*2),
+                                     #nn.Linear(self.d_relation*2, self.d_relation),
+                                     #nn.ReLU(inplace=True),
+                                     #nn.LayerNorm(self.d_relation),
+                                     #nn.Linear(self.d_relation, num_head)
+                                     nn.Linear(self.d_relation, self.d_relation//2),
+                                     nn.ReLU(inplace=True),
+                                     nn.LayerNorm(self.d_relation//2),
+                                     nn.Linear(self.d_relation//2, self.d_relation//4),
+                                     nn.ReLU(inplace=True),
+                                     nn.LayerNorm(self.d_relation//4),
+                                     nn.Linear(self.d_relation//4, num_head)
+                                     )"""
 
-        self.relation_mlp = nn.Sequential(nn.LayerNorm(self.d_relation),
-                                          #nn.Linear(self.d_relation, self.d_relation*2),
-                                          #nn.ReLU(inplace=True),
-                                          #nn.LayerNorm(self.d_relation*2),
-                                          #nn.Linear(self.d_relation*2, self.d_relation),
-                                          #nn.ReLU(inplace=True),
-                                          #nn.LayerNorm(self.d_relation),
-                                          #nn.Linear(self.d_relation, num_head)
-                                          nn.Linear(self.d_relation, self.d_relation//2),
-                                          nn.ReLU(inplace=True),
-                                          nn.LayerNorm(self.d_relation//2),
-                                          nn.Linear(self.d_relation//2, self.d_relation//4),
-                                          nn.ReLU(inplace=True),
-                                          nn.LayerNorm(self.d_relation//4),
-                                          nn.Linear(self.d_relation//4, num_head)
-                                         )
+        self.talking = nn.Linear(self.d_relation, self.d_relation)
                                          
-        self.output_layer = nn.Sequential(nn.LayerNorm(hidden_size),
+        """self.output_layer = nn.Sequential(nn.LayerNorm(hidden_size),
                                           nn.Linear(hidden_size, hidden_size)
-                                          )
-                                          
-        nn.init.xavier_uniform_(self.output_layer[-1].weight, gain=encoder_layer_num**-0.25 * decoder_layer_num**-0.0625)
+                                          )"""
+
+        self.output_layer = nn.Linear(hidden_size, hidden_size)
+        
+        nn.init.xavier_normal_(self.linear_v.weight, gain=gain)
+        nn.init.xavier_normal_(self.output_layer.weight, gain=gain)
 
     def forward(self, node, edge, path, rel_mask):
         """_summary_
@@ -76,9 +74,10 @@ class Relation(nn.Module):
         batch_size = node.size(0)
         
         node = self.norm_act(node)
-        node_q = self.linear_q(node).view(batch_size, -1, self.d_relation, 1)                              # [b, len, d_srel, 1]
-        node_k = self.linear_k(node).view(batch_size, -1, 1, self.d_relation)                              # [b, len, 1, d_srel]
-        node_v = self.linear_v(node).view(batch_size, -1, self.num_head, self.hidden_size//self.num_head)  # [b, len, h, d_v]
+        node_q = self.linear_q(node).view(batch_size, -1, self.d_relation, 1)                                # [b, len, d_srel, 1]
+        node_k = self.linear_k(node).view(batch_size, -1, 1, self.d_relation)                                # [b, len, 1, d_srel]
+        #node_v = self.linear_v(node).view(batch_size, -1, self.num_head, self.hidden_size//self.num_head)    # [b, len, h, d_v]
+        node_v = self.linear_v(node).view(batch_size, -1, self.d_relation, self.hidden_size//self.d_relation)  # [b, len, h, d_v]
 
         node_q = node_q.transpose(1, 2)   # [b, d_srel, len, 1]
         node_k = node_k.transpose(1, 3)   # [b, d_srel, 1, len]
@@ -87,7 +86,8 @@ class Relation(nn.Module):
         # Scaled Dot-Product Attention.
         relation = torch.matmul(node_q, node_k)                                                 # [b, d_srel, q_len, k_len]
         relation = relation.permute(0,2,3,1) + self.linear_edge(edge) + self.linear_path(path)  # [b, q_len, k_len, d_srel]
-        relation = self.relation_mlp(relation)
+        relation *= 3**-0.5
+        relation = self.talking(relation)
         relation += rel_mask
         relation = relation.softmax(dim=2)                          # [b, q_len, k_len, n_heads]
         relation = relation.permute(0,3,1,2)                        # [b, n_heads, q_len, k_len]
@@ -97,24 +97,43 @@ class Relation(nn.Module):
         node = self.output_layer(node)
         return node
 
+class FFNGLU(nn.Module):
+    def __init__(self, hidden_size: int, gain: float):
+        super().__init__()
+        self.ln = nn.LayerNorm(hidden_size)
+        self.pre_ffn_gate = nn.Sequential(nn.Linear(hidden_size, 4*hidden_size),
+                                          nn.GELU()
+                                          )
+        self.pre_ffn = nn.Linear(hidden_size, 4*hidden_size)
+        self.post_ffn = nn.Linear(4*hidden_size, hidden_size)
+        nn.init.xavier_normal_(self.pre_ffn.weight, gain=gain**0.5)
+        nn.init.xavier_normal_(self.pre_ffn_gate[0].weight, gain=gain**0.5)
+        nn.init.xavier_normal_(self.post_ffn.weight, gain=gain)
+
+    def forward(self, x):
+        x = self.ln(x)
+        x = self.pre_ffn_gate(x)*self.pre_ffn(x)
+        x = self.post_ffn(x)
+        return x
+
 class GenovaEncoderLayer(nn.Module):
-    def __init__(self, hidden_size: int, 
-    ffn_hidden_size: int, d_relation: int, 
-    num_head: int, encoder_layer_num: int, 
-    decoder_layer_num: int):
+    def __init__(self, hidden_size: int,
+    d_relation: int, num_head: int, 
+    encoder_layer_num: int = 1, 
+    decoder_layer_num: int = 1):
 
         super().__init__()
-        if decoder_layer_num<1: decoder_layer_num = 1
-        if encoder_layer_num<1: encoder_layer_num = 1
-        self.relation = Relation(hidden_size, d_relation, num_head, encoder_layer_num, decoder_layer_num)
-        self.ffn = nn.Sequential(nn.ReLU(inplace=True),
-                                 nn.LayerNorm(hidden_size),
-                                 nn.Linear(hidden_size, ffn_hidden_size),
-                                 nn.ReLU(inplace=True),
-                                 nn.LayerNorm(ffn_hidden_size),
-                                 nn.Linear(ffn_hidden_size, hidden_size)
-                                 )
-        nn.init.xavier_uniform_(self.ffn[-1].weight, gain=encoder_layer_num**-0.25 * decoder_layer_num**-0.0625)
+        gain = encoder_layer_num**-0.5 * decoder_layer_num**-0.25
+        
+        self.relation = Relation(hidden_size, d_relation, num_head, gain)
+        
+        """self.ffn = nn.Sequential(nn.LayerNorm(hidden_size),
+                                 nn.Linear(hidden_size, hidden_size*4),
+                                 nn.GELU(),
+                                 nn.Linear(hidden_size*4, hidden_size)
+                                 )"""
+
+        self.ffn = FFNGLU(hidden_size)
 
     def forward(self, node, edge, path, rel_mask):
         node = node + self.relation(node, edge, path, rel_mask)
