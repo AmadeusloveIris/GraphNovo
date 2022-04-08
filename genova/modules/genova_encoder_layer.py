@@ -32,6 +32,11 @@ class Relation(nn.Module):
         self.linear_edge = nn.Linear(self.d_relation, self.d_relation)
         self.linear_path = nn.Linear(self.d_relation, self.d_relation)
 
+        nn.init.xavier_normal_(self.linear_q.weight, gain=3**-0.25)
+        nn.init.xavier_normal_(self.linear_k.weight, gain=3**-0.25)
+        nn.init.xavier_normal_(self.linear_edge.weight, gain=3**-0.5)
+        nn.init.xavier_normal_(self.linear_path.weight, gain=3**-0.5)
+
         """self.talking = nn.Sequential(#nn.Linear(self.d_relation, self.d_relation*2),
                                      #nn.ReLU(inplace=True),
                                      #nn.LayerNorm(self.d_relation*2),
@@ -86,7 +91,6 @@ class Relation(nn.Module):
         # Scaled Dot-Product Attention.
         relation = torch.matmul(node_q, node_k)                                                 # [b, d_srel, q_len, k_len]
         relation = relation.permute(0,2,3,1) + self.linear_edge(edge) + self.linear_path(path)  # [b, q_len, k_len, d_srel]
-        relation *= 3**-0.5
         relation = self.talking(relation)
         relation += rel_mask
         relation = relation.softmax(dim=2)                          # [b, q_len, k_len, n_heads]
