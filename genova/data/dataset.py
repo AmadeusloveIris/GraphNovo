@@ -14,9 +14,9 @@ class GenovaDataset(Dataset):
     def __getitem__(self, idx):
         if torch.is_tensor(idx): idx = idx.tolist()
         spec_head = dict(self.spec_header.loc[idx])
-        with open(os.path.join(self.dataset_dir_path, spec_head['Serialized File Name']), 'rb') as f:
-            f.seek(spec_head['Serialized File Pointer'])
-            spec = pickle.loads(gzip.decompress(f.read(spec_head['Serialized Data Length'])))
+        with open(os.path.join(self.dataset_dir_path, spec_head['MSGP File Name']), 'rb') as f:
+            f.seek(spec_head['MSGP File Pointer'])
+            spec = pickle.loads(gzip.decompress(f.read(spec_head['MSGP Data Length'])))
 
         spec['node_input']['charge'] = spec_head['Charge']
         spec.pop('node_mass')

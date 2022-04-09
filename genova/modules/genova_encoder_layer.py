@@ -37,22 +37,6 @@ class Relation(nn.Module):
         nn.init.xavier_normal_(self.linear_edge.weight, gain=3**-0.5)
         nn.init.xavier_normal_(self.linear_path.weight, gain=3**-0.5)
 
-        """self.talking = nn.Sequential(#nn.Linear(self.d_relation, self.d_relation*2),
-                                     #nn.ReLU(inplace=True),
-                                     #nn.LayerNorm(self.d_relation*2),
-                                     #nn.Linear(self.d_relation*2, self.d_relation),
-                                     #nn.ReLU(inplace=True),
-                                     #nn.LayerNorm(self.d_relation),
-                                     #nn.Linear(self.d_relation, num_head)
-                                     nn.Linear(self.d_relation, self.d_relation//2),
-                                     nn.ReLU(inplace=True),
-                                     nn.LayerNorm(self.d_relation//2),
-                                     nn.Linear(self.d_relation//2, self.d_relation//4),
-                                     nn.ReLU(inplace=True),
-                                     nn.LayerNorm(self.d_relation//4),
-                                     nn.Linear(self.d_relation//4, num_head)
-                                     )"""
-
         self.talking = nn.Linear(self.d_relation, self.d_relation)
 
         self.output_layer = nn.Linear(hidden_size, hidden_size)
@@ -77,7 +61,6 @@ class Relation(nn.Module):
         node = self.norm_act(node)
         node_q = self.linear_q(node).view(batch_size, -1, self.d_relation, 1)                                # [b, len, d_srel, 1]
         node_k = self.linear_k(node).view(batch_size, -1, 1, self.d_relation)                                # [b, len, 1, d_srel]
-        #node_v = self.linear_v(node).view(batch_size, -1, self.num_head, self.hidden_size//self.num_head)    # [b, len, h, d_v]
         node_v = self.linear_v(node).view(batch_size, -1, self.d_relation, self.hidden_size//self.d_relation)  # [b, len, h, d_v]
 
         node_q = node_q.transpose(1, 2)   # [b, d_srel, len, 1]

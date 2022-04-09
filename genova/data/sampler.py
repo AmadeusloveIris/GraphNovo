@@ -14,7 +14,8 @@ class GenovaBatchSampler(Sampler):
     def __init__(self, cfg, device, gpu_capacity_scaller, spec_header, bin_boarders, shuffle=True) -> None:
         super().__init__(data_source=None)
         self.cfg = cfg
-        self.bin_boarders = bin_boarders
+        self.bin_boarders = np.array(bin_boarders)
+        self.t_bzs_proportion = ((self.bin_boarders[1:]/self.bin_boarders[1])**2)[::-1]
         self.gpu_capacity = torch.cuda.get_device_properties(device).total_memory*gpu_capacity_scaller
         self.shuffle = shuffle
         self.spec_header = spec_header
@@ -30,10 +31,10 @@ class GenovaBatchSampler(Sampler):
         self.path_d_edge = self.cfg['encoder']['path_encoder']['d_edge']
 
         self.node_sparse = 4 * ((29 + self.d_node_expansion) * self.d_node)
-        self.node = 4 * ((2 * self.d_node_expansion)*self.d_node + 4 * (self.d_node_expansion*self.d_node+self.hidden_size)/2)
+        self.node = 4 * ((2 * self.d_node_expansion) * self.d_node + 4 * (self.d_node_expansion * self.d_node + self.hidden_size)/2)
         
-        self.relation_matrix = 4 * 7 * self.d_relation * self.num_layers
-        self.relation_ffn = 4 * (3 * self.d_relation + 13 * self.hidden_size) * self.num_layers + 4*8*self.hidden_size
+        self.relation_matrix = 4 * 6 * self.d_relation * self.num_layers
+        self.relation_ffn = 4 * (3 * self.d_relation + 13 * self.hidden_size) * self.num_layers + 4 * 18 * self.hidden_size
         
         self.edge_matrix = 4 * (8*self.edge_d_edge + 2*self.d_relation + 2 * self.edge_expansion*self.edge_d_edge)
         self.edge_sparse = 4 * (4 + self.edge_expansion) * self.edge_d_edge
@@ -49,7 +50,7 @@ class GenovaBatchSampler(Sampler):
     def __next__(self):
         if self.bins_readpointer.sum()==len(self.spec_header): raise StopIteration
         bin_index = choices([i for i in range(self.bin_len.size)], \
-                            weights=self.bin_len-self.bins_readpointer)[0]
+                            weights=(self.bin_len-self.bins_readpointer)/self.t_bzs_proportion)[0]
         bin = self.bins[bin_index]
         max_node = 0
         edge_num = 0
@@ -60,11 +61,11 @@ class GenovaBatchSampler(Sampler):
             batch_num = i-self.bins_readpointer[bin_index]+1
             edge_num += spec_index['Edge Num']
             path_num += spec_index['Relation Num']
-            node_consumer = self.node_sparse*max_node*batch_num*30 + self.node*max_node*batch_num
-            edge_consumer = self.edge_matrix*max_node**2*batch_num + self.edge_sparse*edge_num
-            path_consumer = self.path_matrix*max_node**2*batch_num + self.path_sparse*path_num
-            relation_cosumer = self.relation_matrix*max_node**2*batch_num + self.relation_ffn*max_node*batch_num
-            theo = node_consumer+edge_consumer+path_consumer+relation_cosumer
+            node_consumer = self.node_sparse * max_node * batch_num * 30 + self.node * max_node * batch_num
+            edge_consumer = self.edge_matrix * max_node**2 * batch_num + self.edge_sparse * edge_num
+            path_consumer = self.path_matrix * max_node**2 * batch_num + self.path_sparse * path_num
+            relation_cosumer = self.relation_matrix * max_node**2 * batch_num + self.relation_ffn * max_node * batch_num
+            theo = node_consumer + edge_consumer + path_consumer + relation_cosumer
             if theo>self.gpu_capacity:
                 index = bin.iloc[self.bins_readpointer[bin_index]:i].index
                 self.bins_readpointer[bin_index] = i
