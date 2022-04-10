@@ -20,6 +20,7 @@ class GenovaBatchSampler(Sampler):
         self.shuffle = shuffle
         self.spec_header = spec_header
         
+        # 参数导入
         self.hidden_size = self.cfg['hidden_size']
         self.d_relation = self.cfg['encoder']['d_relation']
         self.num_layers = self.cfg['encoder']['num_layers']
@@ -30,17 +31,21 @@ class GenovaBatchSampler(Sampler):
         self.path_expansion = self.cfg['encoder']['path_encoder']['expansion_factor']
         self.path_d_edge = self.cfg['encoder']['path_encoder']['d_edge']
 
+        # Encoding Node 所需显存消耗
         self.node_sparse = 4 * ((29 + self.d_node_expansion) * self.d_node)
         self.node = 4 * ((2 * self.d_node_expansion) * self.d_node + 4 * (self.d_node_expansion * self.d_node + self.hidden_size)/2)
         
-        self.relation_matrix = 4 * 6 * self.d_relation * self.num_layers
-        self.relation_ffn = 4 * (3 * self.d_relation + 13 * self.hidden_size) * self.num_layers + 4 * 18 * self.hidden_size
-        
+        # Direct Edge Graph 所需显存消耗        
         self.edge_matrix = 4 * (8*self.edge_d_edge + 2*self.d_relation + 2 * self.edge_expansion*self.edge_d_edge)
         self.edge_sparse = 4 * (4 + self.edge_expansion) * self.edge_d_edge
         
+        # Longest Path Graph 所需显存消耗
         self.path_matrix = 4 * (8*self.path_d_edge + 2*self.d_relation + 4*self.path_expansion*self.path_d_edge)
         self.path_sparse = 4 * (9 + self.path_expansion) * self.path_d_edge
+
+        # Encoder Layer 所需显存消耗
+        self.relation_matrix = 4 * 6 * self.d_relation * self.num_layers
+        self.relation_ffn = 4 * (3 * self.d_relation + 13 * self.hidden_size) * self.num_layers + 4 * 18 * self.hidden_size
 
     def __iter__(self):
         if self.shuffle: self.spec_header = self.spec_header.sample(frac=1)
@@ -49,6 +54,9 @@ class GenovaBatchSampler(Sampler):
 
     def __next__(self):
         if self.bins_readpointer.sum()==len(self.spec_header): raise StopIteration
+        # 警告： 由于分bucket，并且每个bucket的batch size不同，所以不能直接以每个bucket中剩余的数据量做为权重，
+        # 需要考虑个bucket大致的batch size的比例，并加以修正。否则将导致抽取不均衡，平均来看，batch size大的bucket
+        # 将会被先抽。
         bin_index = choices([i for i in range(self.bin_len.size)], \
                             weights=(self.bin_len-self.bins_readpointer)/self.t_bzs_proportion)[0]
         bin = self.bins[bin_index]

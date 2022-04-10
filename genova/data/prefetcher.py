@@ -2,10 +2,18 @@ import torch
 import collections
 from torch._six import string_classes
 
-class DataPrefetcher():
-    def __init__(self, loader, device, *, non_blocking=True):
+class DataPrefetcher:
+    def __init__(self, loader, device: torch.device):
+        """Data Prefetcher for prefetch data to GPU.
+
+        Args:
+            loader (torch.DataLoader)
+            device (torch.device): Device where you want to move.
+
+        Warning:
+            You have to pin memory before use this.
+        """
         self.device = device
-        self.non_blocking = non_blocking
         self.loader = iter(loader)
         self.stream = torch.cuda.Stream()
         self.preload()
@@ -18,6 +26,8 @@ class DataPrefetcher():
         return self
 
     def __next__(self):
+        # You need to wait until last batch of data
+        # move to device
         torch.cuda.current_stream().wait_stream(self.stream)
         batch = self.batch
         self.preload()
@@ -26,7 +36,7 @@ class DataPrefetcher():
     def to_cuda(self, data):
         with torch.cuda.stream(self.stream):
             if isinstance(data, torch.Tensor):
-                return data.to(device=self.device, non_blocking=self.non_blocking)
+                return data.to(device=self.device, non_blocking=True)
             elif isinstance(data, string_classes):
                 return data
             elif isinstance(data, collections.abc.Mapping):
@@ -46,6 +56,6 @@ class DataPrefetcher():
                     # The sequence type may not support `__init__(iterable)` (e.g., `range`).
                     return [self.to_cuda(sample) for sample in data]
             elif hasattr(data, "to"):
-                return data.to(device=self.device, non_blocking=self.non_blocking)
+                return data.to(device=self.device, non_blocking=True)
             else:
                 return data

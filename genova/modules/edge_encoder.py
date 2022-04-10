@@ -34,25 +34,28 @@ class EdgeEncoder(nn.Module):
         if path_max_length:
             self.edge_pos_embed = nn.Embedding(path_max_length, d_edge)
             self.dist_embed = nn.Embedding(path_max_length, self.d_edge_extanded, padding_idx=0)
-            self.mlp = nn.Sequential(nn.Linear(d_edge, d_edge*2),
-                                    nn.ReLU(inplace=True),
-                                    nn.Linear(d_edge*2, d_edge*4),
-                                    nn.ReLU(inplace=True),
-                                    nn.Linear(d_edge*4, self.d_edge_extanded)
-                                    )
+            self.mlp = nn.Sequential(
+                nn.Linear(d_edge, d_edge*2),
+                nn.ReLU(inplace=True),
+                nn.Linear(d_edge*2, d_edge*4),
+                nn.ReLU(inplace=True),
+                nn.Linear(d_edge*4, self.d_edge_extanded)
+                )
         else:
-            self.mlp = nn.Sequential(nn.Linear(d_edge, d_edge*2),
-                                    nn.ReLU(inplace=True),
-                                    nn.Linear(d_edge*2, self.d_edge_extanded)
-                                    )
+            self.mlp = nn.Sequential(
+                nn.Linear(d_edge, d_edge*2),
+                nn.ReLU(inplace=True),
+                nn.Linear(d_edge*2, self.d_edge_extanded)
+                )
         
-        self.fc = nn.Sequential(nn.LayerNorm(self.d_edge_extanded),
-                                nn.Linear(self.d_edge_extanded, d_edge*4),
-                                nn.ReLU(inplace=True),
-                                nn.LayerNorm(d_edge*4),
-                                nn.Linear(d_edge*4, d_relation),
-                                nn.LayerNorm(d_relation)
-                               )
+        self.fc = nn.Sequential(
+            nn.LayerNorm(self.d_edge_extanded),
+            nn.Linear(self.d_edge_extanded, d_edge*4),
+            nn.ReLU(inplace=True),
+            nn.LayerNorm(d_edge*4),
+            nn.Linear(d_edge*4, d_relation),
+            nn.LayerNorm(d_relation)
+            )
         
 
     def forward(self, rel_type: torch.IntTensor, rel_error: torch.Tensor, 

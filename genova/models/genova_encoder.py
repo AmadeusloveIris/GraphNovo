@@ -1,10 +1,16 @@
 import torch.nn as nn
 
-from ..modules.edge_encoder import EdgeEncoder
-from ..modules.node_encoder import NodeEncoder
-from ..modules.genova_encoder_layer import GenovaEncoderLayer
+from genova.modules.edge_encoder import EdgeEncoder
+from genova.modules.node_encoder import NodeEncoder
+from genova.modules.genova_encoder_layer import GenovaEncoderLayer
 class GenovaEncoder(nn.Module):
     def __init__(self, cfg, bin_classification=False):
+        """_summary_
+
+        Args:
+            cfg (_type_): _description_
+            bin_classification (bool, optional): _description_. Defaults to False.
+        """
         super().__init__()
         self.node_encoder = NodeEncoder(d_ori_node = cfg.preprocessing.d_ori_node, 
                                         max_charge = cfg.preprocessing.max_charge, 
@@ -18,15 +24,13 @@ class GenovaEncoder(nn.Module):
                                         d_ori_edge = cfg.preprocessing.d_ori_edge,
                                         d_edge = cfg.encoder.path_encoder.d_edge,
                                         expansion_factor = cfg.encoder.path_encoder.expansion_factor,
-                                        d_relation = cfg.encoder.d_relation,
-                                        )
+                                        d_relation = cfg.encoder.d_relation)
         
         self.edge_encoder = EdgeEncoder(edge_type_num = cfg.preprocessing.edge_type_num,
                                         d_ori_edge = cfg.preprocessing.d_ori_edge,
                                         d_edge = cfg.encoder.edge_encoder.d_edge,
                                         expansion_factor = cfg.encoder.edge_encoder.expansion_factor,
-                                        d_relation = cfg.encoder.d_relation,
-                                        )
+                                        d_relation = cfg.encoder.d_relation)
 
         self.genova_encoder_layers = nn.ModuleList([GenovaEncoderLayer(hidden_size = cfg.hidden_size,
                                                                        ffn_hidden_size = cfg.encoder.relation.ffn_hidden_size,

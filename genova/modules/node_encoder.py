@@ -30,28 +30,30 @@ class NodeEncoder(nn.Module):
 
         self.ion_source_embed = nn.Embedding(max_subion_num, d_ion_embed,padding_idx=0)
         self.charge_embed = nn.Embedding(max_charge, d_node_extanded)
-        self.shared_mlp = nn.Sequential(nn.Linear(d_node, d_node*2),
-                                        nn.ReLU(inplace=True),
-                                        nn.LayerNorm(d_node*2),
-                                        nn.Linear(d_node*2, d_node*4),
-                                        nn.ReLU(inplace=True),
-                                        nn.LayerNorm(d_node*4),
-                                        nn.Linear(d_node*4, d_node*8),
-                                        nn.ReLU(inplace=True),
-                                        nn.LayerNorm(d_node*8),
-                                        nn.Linear(d_node*8, d_node_extanded),
-                                       )
+        self.shared_mlp = nn.Sequential(
+            nn.Linear(d_node, d_node*2),
+            nn.ReLU(inplace=True),
+            nn.LayerNorm(d_node*2),
+            nn.Linear(d_node*2, d_node*4),
+            nn.ReLU(inplace=True),
+            nn.LayerNorm(d_node*4),
+            nn.Linear(d_node*4, d_node*8),
+            nn.ReLU(inplace=True),
+            nn.LayerNorm(d_node*8),
+            nn.Linear(d_node*8, d_node_extanded)
+            )
         
-        self.fc = nn.Sequential(nn.ReLU(inplace=True),
-                                nn.LayerNorm(d_node_extanded),
-                                nn.Linear(d_node_extanded, d_node_compress),
-                                nn.ReLU(inplace=True),
-                                nn.LayerNorm(d_node_compress),
-                                nn.Linear(d_node_compress, d_node_compress),
-                                nn.ReLU(inplace=True),
-                                nn.LayerNorm(d_node_compress),
-                                nn.Linear(d_node_compress, hidden_size)
-                               )
+        self.fc = nn.Sequential(
+            nn.ReLU(inplace=True),
+            nn.LayerNorm(d_node_extanded),
+            nn.Linear(d_node_extanded, d_node_compress),
+            nn.ReLU(inplace=True),
+            nn.LayerNorm(d_node_compress),
+            nn.Linear(d_node_compress, d_node_compress),
+            nn.ReLU(inplace=True),
+            nn.LayerNorm(d_node_compress),
+            nn.Linear(d_node_compress, hidden_size)
+            )
     
     def forward(self, node_feat, node_sourceion, charge):
         """_summary_

@@ -24,6 +24,7 @@ class Relation(nn.Module):
         self.d_relation = d_relation
         assert self.d_relation % 8 == 0
 
+        # 使用Pre Norm，降低训练难度
         self.norm_act = nn.LayerNorm(hidden_size)
 
         self.linear_q = nn.Linear(hidden_size, self.d_relation)
@@ -32,15 +33,20 @@ class Relation(nn.Module):
         self.linear_edge = nn.Linear(self.d_relation, self.d_relation)
         self.linear_path = nn.Linear(self.d_relation, self.d_relation)
 
+        # 因为这里我们三张图求和，所以每个位置的方差也会求和。所以在这里将每个图输出的初始值方差修正为1/3，即初始化方差乘1/sqrt(3).
         nn.init.xavier_normal_(self.linear_q.weight, gain=3**-0.25)
         nn.init.xavier_normal_(self.linear_k.weight, gain=3**-0.25)
         nn.init.xavier_normal_(self.linear_edge.weight, gain=3**-0.5)
         nn.init.xavier_normal_(self.linear_path.weight, gain=3**-0.5)
-
+        
+        # 由于使用最短或最长路径encoding图会导致每个边包含大量信息，在这里我们对Graphormer原文做出了改进
+        # 我们认为graph encoding之后可以使用更长的vector表示每个node pair之间的关系
+        # 并且我们使用talking head attention对node pair之间的relation ship进行编码，以克服低秩瓶颈
         self.talking = nn.Linear(self.d_relation, self.d_relation)
 
         self.output_layer = nn.Linear(hidden_size, hidden_size)
         
+        #根据DeepNet，对初始化值做修正.
         nn.init.xavier_normal_(self.linear_v.weight, gain=gain)
         nn.init.xavier_normal_(self.output_layer.weight, gain=gain)
 
@@ -83,6 +89,8 @@ class Relation(nn.Module):
 class FFNGLU(nn.Module):
     def __init__(self, hidden_size: int, gain: float):
         super().__init__()
+
+        # 根据“GLU Variants Improve Transformer”，采用GEGLU结构做FFN.
         self.ln = nn.LayerNorm(hidden_size)
         self.pre_ffn_gate = nn.Sequential(nn.Linear(hidden_size, 4*hidden_size),
                                           nn.GELU()
@@ -90,6 +98,8 @@ class FFNGLU(nn.Module):
         self.pre_ffn = nn.Linear(hidden_size, 4*hidden_size)
         self.ffnln = nn.LayerNorm(4*hidden_size)
         self.post_ffn = nn.Linear(4*hidden_size, hidden_size)
+        
+        #根据DeepNet，对初始化值做修正.
         nn.init.xavier_normal_(self.post_ffn.weight, gain=gain)
 
     def forward(self, x):
@@ -106,9 +116,7 @@ class GenovaEncoderLayer(nn.Module):
 
         super().__init__()
         gain = encoder_layer_num**-0.5 * decoder_layer_num**-0.25
-        
         self.relation = Relation(hidden_size, d_relation, num_head, gain)
-
         self.ffn = FFNGLU(hidden_size)
 
     def forward(self, node, edge, path, rel_mask):
