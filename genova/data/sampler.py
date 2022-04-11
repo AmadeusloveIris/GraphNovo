@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from random import choices
+import torch.distributed as dist
 from torch.utils.data import Sampler
 
 
@@ -87,6 +88,7 @@ class GenovaBatchSampler(Sampler):
 
     def generate_bins(self):
         if self.shuffle: self.spec_header.sample(frac=1)
+        if dist.is_initialized(): self.spec_header = self.spec_header.iloc[dist.get_rank()::dist.get_world_size()] # subset of dataset for ddp
         self.bins = [self.spec_header[np.logical_and(self.spec_header['Node Number']>self.bin_boarders[i], \
             self.spec_header['Node Number']<=self.bin_boarders[i+1])] for i in range(len(self.bin_boarders)-1)]
         self.bin_len = np.array([len(bin_index) for bin_index in self.bins])
