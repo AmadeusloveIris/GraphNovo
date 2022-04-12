@@ -1,0 +1,25 @@
+preprocessing:
+  max_charge: 20
+  max_subion_num: 25
+  d_ori_node: 10
+  d_ori_edge: 1
+  edge_type_num: 50150
+  path_max_length: 100
+encoder:
+  d_relation: 256
+  num_layers: 6
+  node_encoder:
+    d_node: 64
+    expansion_factor: 16
+  path_encoder:
+    d_edge: 64
+    expansion_factor: 8
+  edge_encoder:
+    d_edge: 32
+    expansion_factor: 4
+decoder:
+  dictlen: 30
+  max_seq_len: 100
+  num_heads: 16
+  num_layers: 12
+hidden_size: 1024

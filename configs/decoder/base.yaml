@@ -1,0 +1,4 @@
+dictlen: 30
+max_seq_len: 100
+num_heads: 16
+num_layers: 12

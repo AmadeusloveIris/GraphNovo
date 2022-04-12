@@ -109,7 +109,7 @@ class Residual_seq():
     }
 
     def __init__(self, seqs):
-        seq = [i for i in seqs]
+        seq = [i for i in seqs if i in self.__aa_residual_composition]
         self.step_mass = []
         tmp = self.__aa_residual_composition[seq[0]]
         for i in seq[1:]:
@@ -153,6 +153,10 @@ class Residual_seq():
     @classmethod
     def seqs2composition_list(cls,seq):
         return [cls.__aa_residual_composition[aa] for aa in seq]
+    
+    @classmethod
+    def seqs2massmap(cls,seq):
+        return [cls.__aa_residual_composition[aa].mass_calculater() for aa in seq]
 
 class Ion():
     __ion_offset = {

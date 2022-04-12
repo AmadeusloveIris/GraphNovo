@@ -15,7 +15,6 @@ class GenovaCollator(object):
         node_shape = np.array([node_input['node_sourceion'].shape for node_input in node_inputs]).T
         max_node = node_shape[0].max()
         max_subgraph_node = node_shape[1].max()
-        batch_num = len(batch)
         
         node_input = self.node_collate(node_inputs, max_node, max_subgraph_node)
         path_input = self.path_collate(path_inputs, max_node, node_shape)

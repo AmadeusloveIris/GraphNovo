@@ -33,8 +33,6 @@ class GenovaEncoder(nn.Module):
                                         d_relation = cfg.encoder.d_relation)
 
         self.genova_encoder_layers = nn.ModuleList([GenovaEncoderLayer(hidden_size = cfg.hidden_size,
-                                                                       ffn_hidden_size = cfg.encoder.relation.ffn_hidden_size,
-                                                                       num_head = cfg.encoder.relation.num_heads,
                                                                        d_relation = cfg.encoder.d_relation,
                                                                        encoder_layer_num = cfg.encoder.num_layers,
                                                                        decoder_layer_num = cfg.decoder.num_layers)]*cfg.encoder.num_layers)

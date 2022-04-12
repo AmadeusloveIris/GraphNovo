@@ -5,7 +5,6 @@ class Relation(nn.Module):
     def __init__(self, 
                  hidden_size: int,
                  d_relation: int,
-                 num_head: int,
                  gain: float):
         """_summary_
 
@@ -16,10 +15,8 @@ class Relation(nn.Module):
             layer_num (int): How many layers in total
         """
         super().__init__()
-
-        self.num_head  = num_head
         self.hidden_size = hidden_size
-        assert self.hidden_size//self.num_head*self.num_head == self.hidden_size
+        assert self.hidden_size//d_relation*d_relation == self.hidden_size
 
         self.d_relation = d_relation
         assert self.d_relation % 8 == 0
@@ -110,13 +107,13 @@ class FFNGLU(nn.Module):
 
 class GenovaEncoderLayer(nn.Module):
     def __init__(self, hidden_size: int,
-    d_relation: int, num_head: int, 
+    d_relation: int,
     encoder_layer_num: int = 1, 
     decoder_layer_num: int = 1):
 
         super().__init__()
         gain = encoder_layer_num**-0.5 * decoder_layer_num**-0.25
-        self.relation = Relation(hidden_size, d_relation, num_head, gain)
+        self.relation = Relation(hidden_size, d_relation, gain)
         self.ffn = FFNGLU(hidden_size)
 
     def forward(self, node, edge, path, rel_mask):
