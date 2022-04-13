@@ -7,10 +7,60 @@ class GenovaCollator(object):
         self.cfg = cfg
 
     def __call__(self, batch):
-        node_inputs = [record['node_input'] for record in batch]
-        path_inputs = [record['rel_input'] for record in batch]
-        edge_inputs = [record['edge_input'] for record in batch]
-        node_labels = [record['graph_label'] for record in batch]
+        if self.cfg.task == 'optimum_path':
+            spec = [record[0] for record in batch]
+            tgt = [record[1] for record in batch]
+            label = [record[2] for record in batch]
+            encoder_input = self.encoder_collate(spec)
+            decoder_input, graph_probability = self.decoder_collate(tgt)
+            label, label_mask = self.label_collate(label)
+            return encoder_input, decoder_input, graph_probability, label, label_mask
+        
+        elif self.cfg.task == 'sequence_generation':
+            raise NotImplementedError
+        
+        elif self.cfg.task == 'node_classification':
+            raise NotImplementedError
+    
+    def decoder_collate(self, decoder_input):
+        if self.cfg.task == 'optimum_path':
+            tgts_list = [record['tgt'] for record in decoder_input]
+            trans_mask_list = [record['trans_mask'] for record in decoder_input]
+            shape_list = np.array([tgt.shape for tgt in tgts_list])
+            seqdblock_max = shape_list[:,0].max()
+            node_max = shape_list[:,1].max()
+            
+            graph_probability = []
+            trans_mask = []
+            for i in range(len(tgts_list)):
+                graph_probability.append(pad(tgts_list[i],[0,node_max-shape_list[i,1],
+                                                           0,seqdblock_max-shape_list[i,0]]))
+                trans_mask_temp = pad(trans_mask_list[i],[0,node_max-shape_list[i,1]],
+                                      value=-float('inf'))
+                trans_mask.append(pad(trans_mask_temp,[0,0,0,seqdblock_max-shape_list[i,0]]))
+            graph_probability = torch.stack(graph_probability)
+            decoder_input = {'trans_mask': torch.stack(trans_mask).unsqueeze(-1), 
+                             'self_mask': (-float('inf')*torch.ones(seqdblock_max,seqdblock_max)) \
+                             .triu(diagonal=1).unsqueeze(-1)}
+            return decoder_input, graph_probability
+            
+    def label_collate(self, labels):
+        if self.cfg.task == 'optimum_path':
+            shape_list = np.array([label.shape for label in labels])
+            seqdblock_max = shape_list[:,0].max()
+            node_max = shape_list[:,1].max()
+            result = []
+            result_pading_mask = torch.ones(len(labels),seqdblock_max,dtype=bool)
+            for i, label in enumerate(labels):
+                result_pading_mask[i, label.shape[0]:] = 0
+                label = pad(label,[0,node_max-label.shape[1],0,seqdblock_max-label.shape[0]])
+                result.append(label)
+            return torch.stack(result), result_pading_mask
+    
+    def encoder_collate(self, spec):
+        node_inputs = [record['node_input'] for record in spec]
+        path_inputs = [record['rel_input'] for record in spec]
+        edge_inputs = [record['edge_input'] for record in spec]
         
         node_shape = np.array([node_input['node_sourceion'].shape for node_input in node_inputs]).T
         max_node = node_shape[0].max()
@@ -20,13 +70,9 @@ class GenovaCollator(object):
         path_input = self.path_collate(path_inputs, max_node, node_shape)
         edge_input = self.edge_collate(edge_inputs, max_node)
         rel_mask = self.rel_collate(node_shape, max_node)
-        node_labels, node_mask = self.nodelabel_collate(node_labels, max_node)
-        
         encoder_input = {'node_input':node_input,'path_input':path_input,
                          'edge_input':edge_input,'rel_mask':rel_mask}
-        labels = {'node_labels':node_labels, 'node_mask':node_mask}
-        
-        return encoder_input, labels
+        return encoder_input
 
     def node_collate(self, node_inputs, max_node, max_subgraph_node):
         node_feat = []

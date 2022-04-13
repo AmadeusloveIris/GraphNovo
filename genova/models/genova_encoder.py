@@ -4,7 +4,7 @@ from genova.modules.edge_encoder import EdgeEncoder
 from genova.modules.node_encoder import NodeEncoder
 from genova.modules.genova_encoder_layer import GenovaEncoderLayer
 class GenovaEncoder(nn.Module):
-    def __init__(self, cfg, bin_classification=False):
+    def __init__(self, cfg):
         """_summary_
 
         Args:
@@ -32,23 +32,15 @@ class GenovaEncoder(nn.Module):
                                         expansion_factor = cfg.encoder.edge_encoder.expansion_factor,
                                         d_relation = cfg.encoder.d_relation)
 
-        self.genova_encoder_layers = nn.ModuleList([GenovaEncoderLayer(hidden_size = cfg.hidden_size,
-                                                                       d_relation = cfg.encoder.d_relation,
-                                                                       encoder_layer_num = cfg.encoder.num_layers,
-                                                                       decoder_layer_num = cfg.decoder.num_layers)]*cfg.encoder.num_layers)
-        
-        self.bin_classification = bin_classification
-        if self.bin_classification: 
-            self.output_ffn = nn.Sequential(nn.LayerNorm(cfg.hidden_size),
-                                            nn.Linear(cfg.hidden_size,cfg.hidden_size),
-                                            nn.LayerNorm(cfg.hidden_size),
-                                            nn.ReLU(inplace=True),
-                                            nn.Linear(cfg.hidden_size,cfg.hidden_size),
-                                            nn.LayerNorm(cfg.hidden_size),
-                                            nn.ReLU(inplace=True),
-                                            nn.Linear(cfg.hidden_size,2)
-                                            )
-            
+        if cfg.task == 'node_classification':
+            self.genova_encoder_layers = nn.ModuleList([ \
+                GenovaEncoderLayer(hidden_size = cfg.hidden_size,d_relation = cfg.encoder.d_relation,
+                                   encoder_layer_num = cfg.encoder.num_layers)]*cfg.encoder.num_layers)
+        else:
+            self.genova_encoder_layers = nn.ModuleList([ \
+                GenovaEncoderLayer(hidden_size = cfg.hidden_size,d_relation = cfg.encoder.d_relation,
+                                   encoder_layer_num = cfg.encoder.num_layers,
+                                   decoder_layer_num = cfg.decoder.num_layers)]*cfg.encoder.num_layers)
 
     def forward(self, node_input, path_input, edge_input, rel_mask):
         
@@ -59,6 +51,4 @@ class GenovaEncoder(nn.Module):
         for genova_encoder_layer in self.genova_encoder_layers:
             node = genova_encoder_layer(node, edge, path, rel_mask)
         
-        if self.bin_classification:
-            node = self.output_ffn(node)
         return node

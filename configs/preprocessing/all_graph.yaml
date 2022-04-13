@@ -1,5 +1,6 @@
 max_charge: 20
 max_subion_num: 25
+max_seq_len: 32
 d_ori_node: 10
 d_ori_edge: 1
 edge_type_num: 50150

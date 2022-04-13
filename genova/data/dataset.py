@@ -2,14 +2,19 @@ import os
 import gzip
 import torch
 import pickle
+import numpy as np
 from torch.utils.data import Dataset
+from genova.utils.BasicClass import Residual_seq
 
 class GenovaDataset(Dataset):
-    def __init__(self, cfg, *, spec_header, dataset_dir_path):
+    def __init__(self, cfg, *, spec_header, dataset_dir_path, aa_datablock_dict = None):
         super().__init__()
         self.cfg = cfg
         self.spec_header = spec_header
         self.dataset_dir_path = dataset_dir_path
+        if cfg.task == 'sequence_generation' or cfg.task == 'optimum_path_sequence': 
+            assert aa_datablock_dict
+            self.aa_datablock_dict = aa_datablock_dict
 
     def __getitem__(self, idx):
         if torch.is_tensor(idx): idx = idx.tolist()
@@ -19,46 +24,64 @@ class GenovaDataset(Dataset):
             spec = pickle.loads(gzip.decompress(f.read(spec_head['MSGP Datablock Length'])))
 
         spec['node_input']['charge'] = spec_head['Charge']
+        graph_label = spec.pop('graph_label').T
+        graph_label = graph_label[graph_label.any(-1)]
+        node_mass = spec.pop('node_mass')
         seq = spec_head['Annotated Sequence']
-        #spec.pop('node_mass')
         if self.cfg.task == 'node_classification':
-            spec['graph_label'] = torch.any(spec['graph_label'], -1).long()
+            spec['graph_label'] = torch.any(graph_label, 0).long()
             return spec
         
-        elif self.cfg.task == 'optimum path sequence':
+        elif self.cfg.task == 'optimum_path_sequence':
             raise NotImplementedError
             
-        elif self.cfg.task == 'sequence generation':
-            raise NotImplementedError
+        elif self.cfg.task == 'sequence_generation':
+            target = {}
+            seq_blocks = self.seq2seqblock(seq, graph_label)
+            target['tgt'] = seq_blocks
+            target['trans_mask'] = self.trans_mask_sequence_generation(seq_blocks, node_mass)
+            return spec, target
         
-        elif self.cfg.task == 'optimum path':
-            graph_label = spec.pop('graph_label').T
-            graph_propobility = graph_label/torch.where(graph_label.sum(-1)==0,1,graph_label.sum(-1)).unsqueeze(1)
-            graph_propobility = graph_propobility[torch.any(graph_label,-1)]
-            return spec, graph_label
+        elif self.cfg.task == 'optimum_path':
+            trans_mask = torch.Tensor(self.trans_mask_optimum_path(graph_label))
+            graph_probability = torch.Tensor(self.graph_probability_gen(graph_label))
+            tgt = {}
+            tgt['tgt'] = graph_probability[:-1]
+            tgt['trans_mask'] = trans_mask
+            return spec, tgt, graph_probability[1:]
             
-            
-        #spec['graph_label'] = torch.any(spec['graph_label'], -1).long()
-        return spec, target
-
-    def trans_mask_sequence_generation(self, seq, spec):
-        seq_mass = genova.utils.BasicClass.Residual_seq(seq[:-1].replace('L','I')).step_mass-0.02
-        memory_mask = np.zeros((seq_mass.size+1,spec['node_mass'].size))
-        for i, board in enumerate(spec['node_mass'].searchsorted(seq_mass),start=1):
-            memory_mask[i,:board] = -float('inf')
-        memory_mask = np.repeat(memory_mask[np.newaxis],self.cfg.decoder.num_heads,axis=0)
-        return memory_mask
+    def graph_probability_gen(self, graph_label):
+        graph_probability = graph_label/graph_label.sum(-1).unsqueeze(1)
+        return graph_probability
     
-    def seq2seqblock(self, ):
+    def trans_mask_sequence_generation(self,seq_blocks,node_mass):
+        seq_mass = np.array([Residual_seq(seq_block.replace('L','I')).mass for seq_block in seq_blocks]).cumsum()
+        trans_mask = torch.zeros((seq_mass.size,node_mass.size))
+        trans_mask[0,0] = -float('inf')
+        for i, board in enumerate(node_mass.searchsorted(seq_mass+0.02,side='right')[:-1],start=1):
+            trans_mask[i,:board] = -float('inf')
+        return trans_mask
+    
+    def trans_mask_optimum_path(self,graph_label):
+        graph_label = graph_label[1:-1]
+        trans_mask = torch.zeros((graph_label.shape[0]+1,graph_label.shape[1]))
+        trans_mask[0,0] = -float('inf')
+        for i, node_pos in enumerate(graph_label,start=1):
+            trans_mask[i,:torch.where(node_pos)[0].max().item()] = -float('inf')
+        return trans_mask
+    
+    def seq2seqblock(self, seq, graph_label):
         seq_block = []
-        for i, combine_flag in enumerate(~spec['graph_label'].any(0)[1:]):
+        for i, combine_flag in enumerate(~graph_label.any(-1)[1:]):
             if combine_flag:
                 if 'combine_start_index' not in locals():
                     combine_start_index = i
             else:
                 try:
-                    seq_block.append(seq[combine_start_index:i+1])
-                    del(combine_start_index)
+                    if i+1-combine_start_index>6: seq_block.append('X')
+                    else:
+                        seq_block.append(seq[combine_start_index:i+1])
+                        del(combine_start_index)
                 except:
                     seq_block.append(seq[i])
         return seq_block

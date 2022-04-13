@@ -75,8 +75,8 @@ class Relation(nn.Module):
         relation = relation.permute(0,2,3,1) + self.linear_edge(edge) + self.linear_path(path)  # [b, q_len, k_len, d_srel]
         relation = self.talking(relation)
         relation += rel_mask
-        relation = relation.softmax(dim=2)                          # [b, q_len, k_len, n_heads]
-        relation = relation.permute(0,3,1,2)                        # [b, n_heads, q_len, k_len]
+        relation = relation.softmax(dim=2)                          # [b, q_len, k_len, d_srel]
+        relation = relation.permute(0,3,1,2)                        # [b, d_srel, q_len, k_len]
         
         node = torch.matmul(relation, node_v)
         node = node.transpose(1,2).reshape(batch_size, -1, self.hidden_size)
@@ -108,7 +108,7 @@ class FFNGLU(nn.Module):
 class GenovaEncoderLayer(nn.Module):
     def __init__(self, hidden_size: int,
     d_relation: int,
-    encoder_layer_num: int = 1, 
+    encoder_layer_num: int, 
     decoder_layer_num: int = 1):
 
         super().__init__()
