@@ -106,7 +106,6 @@ class Residual_seq():
         'W': Composition('C11H10ON2'),
         'Y': Composition('C9H9O2N'),
         'V': Composition('C5H9ON'),
-        'X': Composition(' '),
     }
 
     def __init__(self, seqs):
