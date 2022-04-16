@@ -37,11 +37,11 @@ class GenovaBatchSampler(Sampler):
         self.node = 4 * ((2 * self.d_node_expansion) * self.d_node + 4 * (self.d_node_expansion * self.d_node + self.hidden_size)/2)
         
         # Direct Edge Graph 所需显存消耗        
-        self.edge_matrix = 4 * (8*self.edge_d_edge + 2*self.d_relation + 2 * self.edge_expansion*self.edge_d_edge)
+        self.edge_matrix = 4 * (2*self.d_relation + 2*self.edge_expansion*self.edge_d_edge)
         self.edge_sparse = 4 * (4 + self.edge_expansion) * self.edge_d_edge
         
         # Longest Path Graph 所需显存消耗
-        self.path_matrix = 4 * (8*self.path_d_edge + 2*self.d_relation + 4*self.path_expansion*self.path_d_edge)
+        self.path_matrix = 4 * (2*self.d_relation + 4*self.path_expansion*self.path_d_edge)
         self.path_sparse = 4 * (9 + self.path_expansion) * self.path_d_edge
 
         # Encoder Layer 所需显存消耗

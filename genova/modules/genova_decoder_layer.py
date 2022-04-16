@@ -185,7 +185,7 @@ class GenovaDecoderLayer(nn.Module):
         gain = encoder_layer_num**-0.5 * decoder_layer_num**-0.25
         self.self_relation = MaskedSelfRelation(tgt_hidden_size, d_relation, gain)
         self.trans_relation = TransRelation(tgt_hidden_size, mem_hidden_size, d_relation, gain)
-        self.ffn = FFNGLU(tgt_hidden_size)
+        self.ffn = FFNGLU(tgt_hidden_size, gain)
 
     def forward(self, *, tgt, mem, trans_mask, self_mask):
         tgt = tgt + self.self_relation(tgt, self_mask)

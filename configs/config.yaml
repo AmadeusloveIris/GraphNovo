@@ -1,9 +1,6 @@
 defaults:
   - preprocessing: all_graph
   - encoder: light
-  - decoder: base
+  - decoder: light
   - _self_
-
-hidden_size: 1024
-task: 'node_classification'
 
