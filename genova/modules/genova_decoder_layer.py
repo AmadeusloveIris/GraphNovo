@@ -29,7 +29,7 @@ class MaskedSelfRelation(nn.Module):
         self.linear_v = nn.Linear(tgt_hidden_size, tgt_hidden_size)
         
         # 使用talking head attention对node pair之间的relation ship进行编码，以克服低秩瓶颈
-        self.talking = nn.Linear(self.d_relation, self.d_relation)
+        self.talking = nn.Linear(self.d_relation, self.d_relation, bias=False)
 
         self.output_layer = nn.Linear(tgt_hidden_size, tgt_hidden_size)
         
@@ -103,7 +103,7 @@ class TransRelation(nn.Module):
         self.linear_v = nn.Linear(mem_hidden_size, tgt_hidden_size)
         
         # 使用talking head attention对node pair之间的relation ship进行编码，以克服低秩瓶颈
-        self.talking = nn.Linear(self.d_relation, self.d_relation)
+        self.talking = nn.Linear(self.d_relation, self.d_relation, bias=False)
 
         self.output_layer = nn.Linear(tgt_hidden_size, tgt_hidden_size)
         
@@ -157,12 +157,12 @@ class FFNGLU(nn.Module):
 
         # 根据“GLU Variants Improve Transformer”，采用GEGLU结构做FFN.
         self.ln = nn.LayerNorm(tgt_hidden_size)
-        self.pre_ffn_gate = nn.Sequential(nn.Linear(tgt_hidden_size, 4*tgt_hidden_size),
+        self.pre_ffn_gate = nn.Sequential(nn.Linear(tgt_hidden_size, 4*tgt_hidden_size, bias=False),
                                           nn.GELU()
                                           )
-        self.pre_ffn = nn.Linear(tgt_hidden_size, 4*tgt_hidden_size)
+        self.pre_ffn = nn.Linear(tgt_hidden_size, 4*tgt_hidden_size, bias=False)
         self.ffnln = nn.LayerNorm(4*tgt_hidden_size)
-        self.post_ffn = nn.Linear(4*tgt_hidden_size, tgt_hidden_size)
+        self.post_ffn = nn.Linear(4*tgt_hidden_size, tgt_hidden_size, bias=False)
         
         #根据DeepNet，对初始化值做修正.
         nn.init.xavier_normal_(self.post_ffn.weight, gain=gain)

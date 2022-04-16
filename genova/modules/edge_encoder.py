@@ -50,11 +50,9 @@ class EdgeEncoder(nn.Module):
         
         self.fc = nn.Sequential(
             nn.LayerNorm(self.d_edge_extanded),
-            nn.Linear(self.d_edge_extanded, d_edge*4),
+            nn.Linear(self.d_edge_extanded, d_relation),
             nn.ReLU(inplace=True),
-            nn.LayerNorm(d_edge*4),
-            nn.Linear(d_edge*4, d_relation),
-            nn.LayerNorm(d_relation)
+            nn.Linear(d_relation, d_relation)
             )
         
 

@@ -54,7 +54,7 @@ class GenovaBatchSampler(Sampler):
         return self
 
     def __next__(self):
-        if self.bins_readpointer.sum()==len(self.spec_header): raise StopIteration
+        if self.bins_readpointer.sum()>=len(self.spec_header): raise StopIteration
         # 警告： 由于分bucket，并且每个bucket的batch size不同，所以不能直接以每个bucket中剩余的数据量做为权重，
         # 需要考虑个bucket大致的batch size的比例，并加以修正。否则将导致抽取不均衡，平均来看，batch size大的bucket
         # 将会被先抽。
@@ -64,7 +64,8 @@ class GenovaBatchSampler(Sampler):
         max_node = 0
         edge_num = 0
         path_num = 0
-        for i in range(self.bins_readpointer[bin_index], len(bin)):
+        i = self.bins_readpointer[bin_index]
+        while i<len(bin):
             spec_index=bin.iloc[i]
             if spec_index['Node Number']>max_node: max_node = spec_index['Node Number']
             batch_num = i-self.bins_readpointer[bin_index]+1
@@ -76,9 +77,21 @@ class GenovaBatchSampler(Sampler):
             relation_cosumer = self.relation_matrix * max_node**2 * batch_num + self.relation_ffn * max_node * batch_num
             theo = node_consumer + edge_consumer + path_consumer + relation_cosumer
             if theo>self.gpu_capacity:
-                index = bin.iloc[self.bins_readpointer[bin_index]:i].index
-                self.bins_readpointer[bin_index] = i
-                return index
+                candidate_batch_size = i-self.bins_readpointer[bin_index]
+                if candidate_batch_size==0: #如果显卡内存容量一条数据都放不了就直接跳过
+                    i += 1
+                    self.bins_readpointer[bin_index] = i
+                    max_node = 0
+                    edge_num = 0
+                    path_num = 0
+                    continue
+                else:
+                    if candidate_batch_size//8 > 0: i = i-candidate_batch_size%8 #强制batch size可以被8整除，优化计算效率(虽然我测试过没什么用)
+                    index = bin.iloc[self.bins_readpointer[bin_index]:i].index
+                    self.bins_readpointer[bin_index] = i
+                    return index
+            else: 
+                i += 1
         index = bin.iloc[self.bins_readpointer[bin_index]:].index
         self.bins_readpointer[bin_index] = len(bin)
         return index
