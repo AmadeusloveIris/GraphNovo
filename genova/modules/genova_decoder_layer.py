@@ -68,10 +68,10 @@ class MaskedSelfRelation(nn.Module):
         relation = relation.softmax(dim=2)                          # [b, q_len, k_len, n_heads]
         relation = relation.permute(0,3,1,2)                        # [b, n_heads, q_len, k_len]
         
-        node = torch.matmul(relation, tgt_v)
-        node = node.transpose(1,2).reshape(batch_size, -1, self.tgt_hidden_size)
-        node = self.output_layer(node)
-        return node
+        tgt_v = torch.matmul(relation, tgt_v)
+        tgt_v = tgt_v.transpose(1,2).reshape(batch_size, -1, self.tgt_hidden_size)
+        tgt_v = self.output_layer(tgt_v)
+        return tgt_v
 
 class TransRelation(nn.Module):
     def __init__(self,
@@ -146,10 +146,10 @@ class TransRelation(nn.Module):
         relation = relation.softmax(dim=2)                          # [b, q_len, k_len, d_srel]
         relation = relation.permute(0,3,1,2)                        # [b, d_srel, q_len, k_len]
         
-        node = torch.matmul(relation, mem_v)
-        node = node.transpose(1,2).reshape(batch_size, -1, self.tgt_hidden_size)
-        node = self.output_layer(node)
-        return node
+        mem_v = torch.matmul(relation, mem_v)
+        mem_v = mem_v.transpose(1,2).reshape(batch_size, -1, self.tgt_hidden_size)
+        mem_v = self.output_layer(mem_v)
+        return mem_v
 
 class FFNGLU(nn.Module):
     def __init__(self, tgt_hidden_size: int, gain: float):
@@ -177,12 +177,11 @@ class GenovaDecoderLayer(nn.Module):
     def __init__(
         self, tgt_hidden_size: int,
         mem_hidden_size: int,
-        d_relation: int,
-        encoder_layer_num: int = 1, 
+        d_relation: int, 
         decoder_layer_num: int = 1):
 
         super().__init__()
-        gain = encoder_layer_num**-0.5 * decoder_layer_num**-0.25
+        gain = decoder_layer_num**-0.25
         self.self_relation = MaskedSelfRelation(tgt_hidden_size, d_relation, gain)
         self.trans_relation = TransRelation(tgt_hidden_size, mem_hidden_size, d_relation, gain)
         self.ffn = FFNGLU(tgt_hidden_size, gain)

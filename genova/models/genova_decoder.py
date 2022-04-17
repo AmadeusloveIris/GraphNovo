@@ -7,7 +7,6 @@ class GenovaDecoder(nn.Module):
         self.genova_decoder_layers = nn.ModuleList([GenovaDecoderLayer(tgt_hidden_size = cfg.encoder.hidden_size,
                                                                        mem_hidden_size = cfg.decoder.hidden_size,
                                                                        d_relation = cfg.decoder.d_relation,
-                                                                       encoder_layer_num = cfg.encoder.num_layers,
                                                                        decoder_layer_num = cfg.decoder.num_layers)]*cfg.decoder.num_layers)
 
     def forward(self, tgt, graph_node, trans_mask, self_mask):
