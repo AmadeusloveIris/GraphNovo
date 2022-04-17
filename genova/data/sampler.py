@@ -82,12 +82,12 @@ class GenovaBatchSampler(Sampler):
         return self
 
     def __next__(self):
-        if self.bins_readpointer.sum()>=self.bin_len.sum(): raise StopIteration
+        if (self.bins_readpointer+1).sum()>=self.bin_len.sum(): raise StopIteration
         # 警告： 由于分bucket，并且每个bucket的batch size不同，所以不能直接以每个bucket中剩余的数据量做为权重，
         # 需要考虑个bucket大致的batch size的比例，并加以修正。否则将导致抽取不均衡，平均来看，batch size大的bucket
         # 将会被先抽。
         bin_index = choices([i for i in range(self.bin_len.size)], \
-                            weights=(self.bin_len-self.bins_readpointer)/self.t_bzs_proportion)[0]
+                            weights=(self.bin_len-(self.bins_readpointer+1))/self.t_bzs_proportion)[0]
         bin = self.bins[bin_index]
         max_node = 0
         edge_num = 0
@@ -131,7 +131,7 @@ class GenovaBatchSampler(Sampler):
             else: 
                 i += 1
         index = bin.iloc[self.bins_readpointer[bin_index]:].index
-        self.bins_readpointer[bin_index] = len(bin)
+        self.bins_readpointer[bin_index] = len(bin)-1
         return index
         
     def __len__(self):
