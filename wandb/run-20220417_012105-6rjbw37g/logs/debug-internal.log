@@ -1,0 +1,134 @@
+2022-04-17 01:21:05,865 INFO    MainThread:2638723 [internal.py:wandb_internal():92] W&B internal server running at pid: 2638723, started at: 2022-04-17 01:21:05.865455
+2022-04-17 01:21:05,868 INFO    WriterThread:2638723 [datastore.py:open_for_write():77] open: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/run-6rjbw37g.wandb
+2022-04-17 01:21:05,869 DEBUG   SenderThread:2638723 [sender.py:send():235] send: header
+2022-04-17 01:21:05,870 DEBUG   SenderThread:2638723 [sender.py:send():235] send: run
+2022-04-17 01:21:05,980 INFO    SenderThread:2638723 [dir_watcher.py:__init__():169] watching files in: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files
+2022-04-17 01:21:05,980 INFO    SenderThread:2638723 [sender.py:_start_run_threads():812] run started: 6rjbw37g with start time 1650158465
+2022-04-17 01:21:05,980 DEBUG   SenderThread:2638723 [sender.py:send():235] send: summary
+2022-04-17 01:21:05,980 INFO    SenderThread:2638723 [sender.py:_save_file():947] saving file wandb-summary.json with policy end
+2022-04-17 01:21:05,982 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: check_version
+2022-04-17 01:21:05,982 DEBUG   SenderThread:2638723 [sender.py:send_request():249] send_request: check_version
+2022-04-17 01:21:06,039 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: run_start
+2022-04-17 01:21:06,987 INFO    Thread-7  :2638723 [dir_watcher.py:_on_file_created():217] file/dir created: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/wandb-summary.json
+2022-04-17 01:21:07,398 DEBUG   HandlerThread:2638723 [meta.py:__init__():37] meta init
+2022-04-17 01:21:07,399 DEBUG   HandlerThread:2638723 [meta.py:__init__():51] meta init done
+2022-04-17 01:21:07,399 DEBUG   HandlerThread:2638723 [meta.py:probe():211] probe
+2022-04-17 01:21:07,406 DEBUG   HandlerThread:2638723 [meta.py:_setup_git():201] setup git
+2022-04-17 01:21:07,435 DEBUG   HandlerThread:2638723 [meta.py:_setup_git():208] setup git done
+2022-04-17 01:21:07,435 DEBUG   HandlerThread:2638723 [meta.py:_save_pip():55] save pip
+2022-04-17 01:21:07,436 DEBUG   HandlerThread:2638723 [meta.py:_save_pip():69] save pip done
+2022-04-17 01:21:07,436 DEBUG   HandlerThread:2638723 [meta.py:_save_conda():76] save conda
+2022-04-17 01:21:07,985 INFO    Thread-7  :2638723 [dir_watcher.py:_on_file_created():217] file/dir created: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/conda-environment.yaml
+2022-04-17 01:21:07,985 INFO    Thread-7  :2638723 [dir_watcher.py:_on_file_created():217] file/dir created: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/requirements.txt
+2022-04-17 01:21:10,906 DEBUG   HandlerThread:2638723 [meta.py:_save_conda():86] save conda done
+2022-04-17 01:21:10,906 DEBUG   HandlerThread:2638723 [meta.py:probe():249] probe done
+2022-04-17 01:21:10,912 DEBUG   SenderThread:2638723 [sender.py:send():235] send: files
+2022-04-17 01:21:10,912 INFO    SenderThread:2638723 [sender.py:_save_file():947] saving file wandb-metadata.json with policy now
+2022-04-17 01:21:10,932 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: stop_status
+2022-04-17 01:21:10,933 DEBUG   SenderThread:2638723 [sender.py:send_request():249] send_request: stop_status
+2022-04-17 01:21:10,937 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: pause
+2022-04-17 01:21:10,937 INFO    HandlerThread:2638723 [handler.py:handle_request_pause():659] stopping system metrics thread
+2022-04-17 01:21:10,986 INFO    Thread-7  :2638723 [dir_watcher.py:_on_file_modified():230] file/dir modified: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/conda-environment.yaml
+2022-04-17 01:21:10,987 INFO    Thread-7  :2638723 [dir_watcher.py:_on_file_created():217] file/dir created: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/wandb-metadata.json
+2022-04-17 01:21:10,987 INFO    Thread-7  :2638723 [dir_watcher.py:_on_file_created():217] file/dir created: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/output.log
+2022-04-17 01:21:11,015 DEBUG   SenderThread:2638723 [sender.py:send():235] send: telemetry
+2022-04-17 01:21:11,087 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: resume
+2022-04-17 01:21:11,087 INFO    HandlerThread:2638723 [handler.py:handle_request_resume():650] starting system metrics thread
+2022-04-17 01:21:11,094 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: pause
+2022-04-17 01:21:11,094 INFO    HandlerThread:2638723 [handler.py:handle_request_pause():659] stopping system metrics thread
+2022-04-17 01:21:11,097 DEBUG   SenderThread:2638723 [sender.py:send():235] send: telemetry
+2022-04-17 01:21:11,222 INFO    Thread-11 :2638723 [upload_job.py:push():137] Uploaded file /tmp/tmp_vddi5c1wandb/9x2hbru5-wandb-metadata.json
+2022-04-17 01:21:11,225 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: resume
+2022-04-17 01:21:11,225 INFO    HandlerThread:2638723 [handler.py:handle_request_resume():650] starting system metrics thread
+2022-04-17 01:21:11,226 DEBUG   SenderThread:2638723 [sender.py:send():235] send: stats
+2022-04-17 01:21:11,227 DEBUG   SenderThread:2638723 [sender.py:send():235] send: stats
+2022-04-17 01:21:26,061 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: stop_status
+2022-04-17 01:21:26,061 DEBUG   SenderThread:2638723 [sender.py:send_request():249] send_request: stop_status
+2022-04-17 01:21:28,589 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: partial_history
+2022-04-17 01:21:28,590 DEBUG   SenderThread:2638723 [sender.py:send():235] send: history
+2022-04-17 01:21:28,591 DEBUG   SenderThread:2638723 [sender.py:send():235] send: summary
+2022-04-17 01:21:28,593 INFO    SenderThread:2638723 [sender.py:_save_file():947] saving file wandb-summary.json with policy end
+2022-04-17 01:21:28,994 INFO    Thread-7  :2638723 [dir_watcher.py:_on_file_modified():230] file/dir modified: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/wandb-summary.json
+2022-04-17 01:21:31,996 INFO    Thread-7  :2638723 [dir_watcher.py:_on_file_modified():230] file/dir modified: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/output.log
+2022-04-17 01:21:36,997 INFO    Thread-7  :2638723 [dir_watcher.py:_on_file_modified():230] file/dir modified: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/config.yaml
+2022-04-17 01:21:40,617 DEBUG   SenderThread:2638723 [sender.py:send():235] send: stats
+2022-04-17 01:21:41,135 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: stop_status
+2022-04-17 01:21:41,135 DEBUG   SenderThread:2638723 [sender.py:send_request():249] send_request: stop_status
+2022-04-17 01:21:44,906 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: partial_history
+2022-04-17 01:21:44,908 DEBUG   SenderThread:2638723 [sender.py:send():235] send: history
+2022-04-17 01:21:44,908 DEBUG   SenderThread:2638723 [sender.py:send():235] send: summary
+2022-04-17 01:21:44,913 INFO    SenderThread:2638723 [sender.py:_save_file():947] saving file wandb-summary.json with policy end
+2022-04-17 01:21:45,001 INFO    Thread-7  :2638723 [dir_watcher.py:_on_file_modified():230] file/dir modified: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/wandb-summary.json
+2022-04-17 01:21:48,002 INFO    Thread-7  :2638723 [dir_watcher.py:_on_file_modified():230] file/dir modified: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/output.log
+2022-04-17 01:21:56,206 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: stop_status
+2022-04-17 01:21:56,206 DEBUG   SenderThread:2638723 [sender.py:send_request():249] send_request: stop_status
+2022-04-17 01:22:01,172 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: partial_history
+2022-04-17 01:22:01,173 DEBUG   SenderThread:2638723 [sender.py:send():235] send: history
+2022-04-17 01:22:01,173 DEBUG   SenderThread:2638723 [sender.py:send():235] send: summary
+2022-04-17 01:22:01,177 INFO    SenderThread:2638723 [sender.py:_save_file():947] saving file wandb-summary.json with policy end
+2022-04-17 01:22:02,008 INFO    Thread-7  :2638723 [dir_watcher.py:_on_file_modified():230] file/dir modified: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/wandb-summary.json
+2022-04-17 01:22:04,009 INFO    Thread-7  :2638723 [dir_watcher.py:_on_file_modified():230] file/dir modified: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/output.log
+2022-04-17 01:22:11,280 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: stop_status
+2022-04-17 01:22:11,281 DEBUG   SenderThread:2638723 [sender.py:send_request():249] send_request: stop_status
+2022-04-17 01:22:12,145 DEBUG   SenderThread:2638723 [sender.py:send():235] send: stats
+2022-04-17 01:22:17,196 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: partial_history
+2022-04-17 01:22:17,197 DEBUG   SenderThread:2638723 [sender.py:send():235] send: history
+2022-04-17 01:22:17,198 DEBUG   SenderThread:2638723 [sender.py:send():235] send: summary
+2022-04-17 01:22:17,198 INFO    SenderThread:2638723 [sender.py:_save_file():947] saving file wandb-summary.json with policy end
+2022-04-17 01:22:18,016 INFO    Thread-7  :2638723 [dir_watcher.py:_on_file_modified():230] file/dir modified: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/wandb-summary.json
+2022-04-17 01:22:20,017 INFO    Thread-7  :2638723 [dir_watcher.py:_on_file_modified():230] file/dir modified: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/output.log
+2022-04-17 01:22:26,352 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: stop_status
+2022-04-17 01:22:26,353 DEBUG   SenderThread:2638723 [sender.py:send_request():249] send_request: stop_status
+2022-04-17 01:22:33,077 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: partial_history
+2022-04-17 01:22:33,079 DEBUG   SenderThread:2638723 [sender.py:send():235] send: history
+2022-04-17 01:22:33,079 DEBUG   SenderThread:2638723 [sender.py:send():235] send: summary
+2022-04-17 01:22:33,080 INFO    SenderThread:2638723 [sender.py:_save_file():947] saving file wandb-summary.json with policy end
+2022-04-17 01:22:34,023 INFO    Thread-7  :2638723 [dir_watcher.py:_on_file_modified():230] file/dir modified: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/wandb-summary.json
+2022-04-17 01:22:36,024 INFO    Thread-7  :2638723 [dir_watcher.py:_on_file_modified():230] file/dir modified: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/output.log
+2022-04-17 01:22:41,461 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: stop_status
+2022-04-17 01:22:41,462 DEBUG   SenderThread:2638723 [sender.py:send_request():249] send_request: stop_status
+2022-04-17 01:22:43,551 DEBUG   SenderThread:2638723 [sender.py:send():235] send: stats
+2022-04-17 01:22:56,533 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: stop_status
+2022-04-17 01:22:56,533 DEBUG   SenderThread:2638723 [sender.py:send_request():249] send_request: stop_status
+2022-04-17 01:23:04,190 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: partial_history
+2022-04-17 01:23:04,191 DEBUG   SenderThread:2638723 [sender.py:send():235] send: history
+2022-04-17 01:23:04,192 DEBUG   SenderThread:2638723 [sender.py:send():235] send: summary
+2022-04-17 01:23:04,195 INFO    SenderThread:2638723 [sender.py:_save_file():947] saving file wandb-summary.json with policy end
+2022-04-17 01:23:05,039 INFO    Thread-7  :2638723 [dir_watcher.py:_on_file_modified():230] file/dir modified: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/wandb-summary.json
+2022-04-17 01:23:06,039 INFO    Thread-7  :2638723 [dir_watcher.py:_on_file_modified():230] file/dir modified: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/output.log
+2022-04-17 01:23:11,601 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: stop_status
+2022-04-17 01:23:11,601 DEBUG   SenderThread:2638723 [sender.py:send_request():249] send_request: stop_status
+2022-04-17 01:23:15,031 DEBUG   SenderThread:2638723 [sender.py:send():235] send: stats
+2022-04-17 01:23:18,452 WARNING MainThread:2638723 [internal.py:wandb_internal():155] Internal process interrupt: 1
+2022-04-17 01:23:18,550 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: pause
+2022-04-17 01:23:18,550 INFO    HandlerThread:2638723 [handler.py:handle_request_pause():659] stopping system metrics thread
+2022-04-17 01:23:18,693 DEBUG   SenderThread:2638723 [sender.py:send():235] send: stats
+2022-04-17 01:23:26,670 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: stop_status
+2022-04-17 01:23:26,670 DEBUG   SenderThread:2638723 [sender.py:send_request():249] send_request: stop_status
+2022-04-17 01:23:41,747 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: stop_status
+2022-04-17 01:23:41,748 DEBUG   SenderThread:2638723 [sender.py:send_request():249] send_request: stop_status
+2022-04-17 01:23:56,816 DEBUG   HandlerThread:2638723 [handler.py:handle_request():141] handle_request: stop_status
+2022-04-17 01:23:56,817 DEBUG   SenderThread:2638723 [sender.py:send_request():249] send_request: stop_status
+2022-04-17 01:24:09,367 WARNING MainThread:2638723 [internal.py:wandb_internal():155] Internal process interrupt: 2
+2022-04-17 01:24:09,367 ERROR   MainThread:2638723 [internal.py:wandb_internal():158] Internal process interrupted.
+2022-04-17 01:24:09,374 INFO    HandlerThread:2638723 [handler.py:finish():778] shutting down handler
+2022-04-17 01:24:09,375 DEBUG   SenderThread:2638723 [sender.py:send():235] send: telemetry
+2022-04-17 01:24:09,375 INFO    WriterThread:2638723 [datastore.py:close():281] close: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/run-6rjbw37g.wandb
+2022-04-17 01:24:09,377 INFO    SenderThread:2638723 [sender.py:finish():1078] shutting down sender
+2022-04-17 01:24:09,378 INFO    SenderThread:2638723 [dir_watcher.py:finish():283] shutting down directory watcher
+2022-04-17 01:24:10,051 INFO    SenderThread:2638723 [dir_watcher.py:_on_file_modified():230] file/dir modified: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/output.log
+2022-04-17 01:24:10,052 INFO    SenderThread:2638723 [dir_watcher.py:finish():313] scan: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files
+2022-04-17 01:24:10,052 INFO    SenderThread:2638723 [dir_watcher.py:finish():327] scan save: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/wandb-metadata.json wandb-metadata.json
+2022-04-17 01:24:10,052 INFO    SenderThread:2638723 [dir_watcher.py:finish():327] scan save: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/config.yaml config.yaml
+2022-04-17 01:24:10,052 INFO    SenderThread:2638723 [dir_watcher.py:finish():327] scan save: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/conda-environment.yaml conda-environment.yaml
+2022-04-17 01:24:10,053 INFO    SenderThread:2638723 [dir_watcher.py:finish():327] scan save: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/output.log output.log
+2022-04-17 01:24:10,060 INFO    SenderThread:2638723 [dir_watcher.py:finish():327] scan save: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/requirements.txt requirements.txt
+2022-04-17 01:24:10,066 INFO    SenderThread:2638723 [dir_watcher.py:finish():327] scan save: /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/wandb-summary.json wandb-summary.json
+2022-04-17 01:24:10,072 INFO    SenderThread:2638723 [file_pusher.py:finish():145] shutting down file pusher
+2022-04-17 01:24:10,073 INFO    SenderThread:2638723 [file_pusher.py:join():150] waiting for file pusher
+2022-04-17 01:24:10,386 INFO    Thread-14 :2638723 [upload_job.py:push():137] Uploaded file /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/config.yaml
+2022-04-17 01:24:10,439 INFO    Thread-18 :2638723 [upload_job.py:push():137] Uploaded file /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/wandb-summary.json
+2022-04-17 01:24:10,442 INFO    Thread-15 :2638723 [upload_job.py:push():137] Uploaded file /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/conda-environment.yaml
+2022-04-17 01:24:10,465 INFO    Thread-16 :2638723 [upload_job.py:push():137] Uploaded file /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/output.log
+2022-04-17 01:24:10,490 INFO    Thread-17 :2638723 [upload_job.py:push():137] Uploaded file /home/z37mao/Genova/wandb/run-20220417_012105-6rjbw37g/files/requirements.txt
+2022-04-17 01:24:11,139 INFO    MainThread:2638723 [internal.py:handle_exit():82] Internal process exited

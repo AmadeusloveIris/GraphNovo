@@ -1,0 +1,33 @@
+
+[34m[1mwandb[39m[22m: logging graph, to disable use `wandb.watch(log_graph=False)`
+11.026991925239564
+10.520394506454467
+10.723478050231934
+10.73738034248352
+Exception in thread ChkStopThr:
+Traceback (most recent call last):
+  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/threading.py", line 973, in _bootstrap_inner
+Exception in thread NetStatThr:
+Traceback (most recent call last):
+  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/threading.py", line 973, in _bootstrap_inner
+    self.run()
+  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/threading.py", line 910, in run
+    self.run()
+  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/threading.py", line 910, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/site-packages/wandb/sdk/wandb_run.py", line 167, in check_status
+    self._target(*self._args, **self._kwargs)
+  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/site-packages/wandb/sdk/wandb_run.py", line 149, in check_network_status
+    status_response = self._interface.communicate_stop_status()
+  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/site-packages/wandb/sdk/interface/interface.py", line 114, in communicate_stop_status
+    status_response = self._interface.communicate_network_status()
+  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/site-packages/wandb/sdk/interface/interface.py", line 125, in communicate_network_status
+    resp = self._communicate_stop_status(status)
+  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/site-packages/wandb/sdk/interface/interface_shared.py", line 387, in _communicate_stop_status
+    resp = self._communicate(req, local=True)
+  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/site-packages/wandb/sdk/interface/interface_shared.py", line 222, in _communicate
+    resp = self._communicate_network_status(status)
+  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/site-packages/wandb/sdk/interface/interface_shared.py", line 397, in _communicate_network_status
+    return self._communicate_async(rec, local=local).get(timeout=timeout)
+  File "/home/z37mao/anaconda3/envs/genova_torch/lib/python3.9/site-packages/wandb/sdk/interface/interface_shared.py", line 227, in _communicate_async
+    resp = self._communicate(req, local=True)

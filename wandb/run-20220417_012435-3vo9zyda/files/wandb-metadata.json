@@ -1,0 +1,26 @@
+{
+    "os": "Linux-5.4.0-105-generic-x86_64-with-glibc2.31",
+    "python": "3.9.7",
+    "heartbeatAt": "2022-04-17T01:24:37.489225",
+    "startedAt": "2022-04-17T01:24:35.173735",
+    "docker": null,
+    "gpu": "Tesla V100-SXM2-16GB",
+    "gpu_count": 4,
+    "cpu_count": 32,
+    "cuda": "11.0.228",
+    "args": [
+        "-f",
+        "/home/z37mao/.local/share/jupyter/runtime/kernel-b545e530-31b4-4667-8a81-8325b2e6d376.json"
+    ],
+    "state": "running",
+    "program": "<python with no main file>",
+    "git": {
+        "remote": "https://github.com/AmadeusloveIris/Genova.git",
+        "commit": "8896e27cc65c4b9f16d46fe725b7f60f44f42385"
+    },
+    "email": "z37mao@uwaterloo.ca",
+    "root": "/home/z37mao/Genova",
+    "host": "ming-gpu-v100.cs.uwaterloo.ca",
+    "username": "z37mao",
+    "executable": "/home/z37mao/anaconda3/envs/genova_torch/bin/python"
+}
