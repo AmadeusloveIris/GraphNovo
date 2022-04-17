@@ -64,7 +64,7 @@ class GenovaBatchSampler(Sampler):
     def __init__(self, cfg, device: Union[int, torch.device], 
                  gpu_capacity_scaller: float, spec_header, 
                  bin_boarders: List, model, shuffle=True, 
-                 sample_time_limitation = 5000) -> Sampler:
+                 sample_time_limitation = 20000) -> Sampler:
         super().__init__(data_source=None)
         self.cfg = cfg
         self.bin_boarders = np.array(bin_boarders)
@@ -74,7 +74,7 @@ class GenovaBatchSampler(Sampler):
         self.model_mem = sum([param.nelement() for param in model.parameters()])*4*4
         self.encoder_mem = EncoderMem(cfg)
         if 'decoder' in cfg: self.decoder_mem = DecoderMem(cfg)
-        self.t_bzs_proportion = self.bzs_sampling(spec_header, sample_time_limitation)
+        self.t_bzs_proportion = self.bzs_sampling(sample_time_limitation)
 
     def __iter__(self):
         if self.shuffle: self.spec_header = self.spec_header.sample(frac=1)
@@ -88,6 +88,7 @@ class GenovaBatchSampler(Sampler):
         # 将会被先抽。
         bin_index = choices([i for i in range(self.bin_len.size)], \
                             weights=(self.bin_len-self.bins_readpointer)/self.t_bzs_proportion)[0]
+        print((self.bin_len-self.bins_readpointer)/(self.bin_len-self.bins_readpointer).sum())
         bin = self.bins[bin_index]
         max_node = 0
         edge_num = 0
@@ -145,8 +146,8 @@ class GenovaBatchSampler(Sampler):
         self.bin_len = np.array([len(bin_index) for bin_index in self.bins])
         self.bins_readpointer = np.zeros(len(self.bin_boarders)-1,dtype=int)
     
-    def bzs_sampling(self,spec_header,sample_time_limitation):
-        spec_header = spec_header.sample(frac=1)
+    def bzs_sampling(self,sample_time_limitation):
+        spec_header = self.spec_header.sample(frac=1)
         bins = [spec_header[np.logical_and(spec_header['Node Number']>self.bin_boarders[i], \
             spec_header['Node Number']<=self.bin_boarders[i+1])] for i in range(len(self.bin_boarders)-1)]
         bins_readpointer = np.zeros(len(self.bin_boarders)-1,dtype=int)
