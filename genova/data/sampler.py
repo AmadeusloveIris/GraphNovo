@@ -88,7 +88,6 @@ class GenovaBatchSampler(Sampler):
         # 将会被先抽。
         bin_index = choices([i for i in range(self.bin_len.size)], \
                             weights=(self.bin_len-self.bins_readpointer)/self.t_bzs_proportion)[0]
-        print((self.bin_len-self.bins_readpointer)/(self.bin_len-self.bins_readpointer).sum())
         bin = self.bins[bin_index]
         max_node = 0
         edge_num = 0
