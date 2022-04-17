@@ -1,9 +1,10 @@
 import torch
 import collections
+from typing import Union
 from torch._six import string_classes
 
 class DataPrefetcher:
-    def __init__(self, loader, device: torch.device):
+    def __init__(self, loader, device: Union[int, torch.device]):
         """Data Prefetcher for prefetch data to GPU.
 
         Args:
@@ -14,15 +15,18 @@ class DataPrefetcher:
             You have to pin memory before use this.
         """
         self.device = device
-        self.loader = iter(loader)
+        self.loader_ori = loader
+        #self.loader = loader
         self.stream = torch.cuda.Stream()
-        self.preload()
+        #self.preload()
 
     def preload(self):
         self.batch = next(self.loader)
         self.batch = self.to_cuda(self.batch)
     
     def __iter__(self):
+        self.loader = iter(self.loader_ori)
+        self.preload()
         return self
 
     def __next__(self):

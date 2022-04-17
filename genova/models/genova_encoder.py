@@ -17,7 +17,7 @@ class GenovaEncoder(nn.Module):
                                         max_subion_num = cfg.preprocessing.max_subion_num, 
                                         d_node = cfg.encoder.node_encoder.d_node,
                                         expansion_factor = cfg.encoder.node_encoder.expansion_factor,
-                                        hidden_size = cfg.hidden_size)
+                                        hidden_size = cfg.encoder.hidden_size)
 
         self.path_encoder = EdgeEncoder(edge_type_num = cfg.preprocessing.edge_type_num, 
                                         path_max_length = cfg.preprocessing.path_max_length, 
@@ -34,11 +34,11 @@ class GenovaEncoder(nn.Module):
 
         if cfg.task == 'node_classification':
             self.genova_encoder_layers = nn.ModuleList([ \
-                GenovaEncoderLayer(hidden_size = cfg.hidden_size,d_relation = cfg.encoder.d_relation,
+                GenovaEncoderLayer(hidden_size = cfg.encoder.hidden_size,d_relation = cfg.encoder.d_relation,
                                    encoder_layer_num = cfg.encoder.num_layers)]*cfg.encoder.num_layers)
         else:
             self.genova_encoder_layers = nn.ModuleList([ \
-                GenovaEncoderLayer(hidden_size = cfg.hidden_size,d_relation = cfg.encoder.d_relation,
+                GenovaEncoderLayer(hidden_size = cfg.encoder.hidden_size,d_relation = cfg.encoder.d_relation,
                                    encoder_layer_num = cfg.encoder.num_layers,
                                    decoder_layer_num = cfg.decoder.num_layers)]*cfg.encoder.num_layers)
 

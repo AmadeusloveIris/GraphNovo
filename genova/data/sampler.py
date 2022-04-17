@@ -1,28 +1,16 @@
 import torch
 import numpy as np
+from typing import List, Union
 from random import choices
 import torch.distributed as dist
+from dataclasses import dataclass
 from torch.utils.data import Sampler
 
-
-class GenovaBatchSampler(Sampler):
-    """Wraps another sampler to yield a mini-batch of indices.
-
-    Args:
-        data_source (Dataset): dataset to sample from
-    """
-
-    def __init__(self, cfg, device, gpu_capacity_scaller, spec_header, bin_boarders, shuffle=True) -> None:
-        super().__init__(data_source=None)
+@dataclass
+class EncoderMem:
+    def __init__(self,cfg):
         self.cfg = cfg
-        self.bin_boarders = np.array(bin_boarders)
-        self.t_bzs_proportion = ((self.bin_boarders[1:]/self.bin_boarders[1])**2)[::-1]
-        self.gpu_capacity = torch.cuda.get_device_properties(device).total_memory*gpu_capacity_scaller
-        self.shuffle = shuffle
-        self.spec_header = spec_header
-        
-        # 参数导入
-        self.hidden_size = self.cfg['hidden_size']
+        self.hidden_size = self.cfg['encoder']['hidden_size']
         self.d_relation = self.cfg['encoder']['d_relation']
         self.num_layers = self.cfg['encoder']['num_layers']
         self.d_node = self.cfg['encoder']['node_encoder']['d_node']
@@ -35,18 +23,55 @@ class GenovaBatchSampler(Sampler):
         # Encoding Node 所需显存消耗
         self.node_sparse = 4 * ((29 + self.d_node_expansion) * self.d_node)
         self.node = 4 * ((2 * self.d_node_expansion) * self.d_node + 4 * (self.d_node_expansion * self.d_node + self.hidden_size)/2)
-        
+
         # Direct Edge Graph 所需显存消耗        
         self.edge_matrix = 4 * (2*self.d_relation + 2*self.edge_expansion*self.edge_d_edge)
         self.edge_sparse = 4 * (4 + self.edge_expansion) * self.edge_d_edge
-        
+
         # Longest Path Graph 所需显存消耗
         self.path_matrix = 4 * (2*self.d_relation + 4*self.path_expansion*self.path_d_edge)
         self.path_sparse = 4 * (9 + self.path_expansion) * self.path_d_edge
 
         # Encoder Layer 所需显存消耗
-        self.relation_matrix = 4 * 6 * self.d_relation * self.num_layers
-        self.relation_ffn = 4 * (3 * self.d_relation + 13 * self.hidden_size) * self.num_layers + 4 * 18 * self.hidden_size
+        self.relation_matrix = 4 * 8 * self.d_relation * self.num_layers
+        self.relation_linear = 4 * (2 * self.d_relation + 4 * self.hidden_size) * self.num_layers
+        self.relation_ffn = 4 * 22 * self.hidden_size * self.num_layers
+
+@dataclass
+class DecoderMem:
+    def __init__(self,cfg):
+        self.cfg = cfg
+        self.hidden_size = self.cfg['decoder']['hidden_size']
+        self.d_relation = self.cfg['decoder']['d_relation']
+        self.num_layers = self.cfg['decoder']['num_layers']
+
+        # Encoder Layer 所需显存消耗
+        self.self_relation_matrix = 4 * 4 * self.d_relation * self.num_layers
+        self.self_relation_linear = 4 * (2 * self.d_relation + 4 * self.hidden_size) * self.num_layers
+
+        self.trans_relation_matrix = 4 * 4 * self.d_relation * self.num_layers
+        self.trans_relation_linear = 4 * (2 * self.d_relation + 4 * self.hidden_size) * self.num_layers
+
+        self.relation_ffn = 4 * 22 * self.hidden_size * self.num_layers
+
+class GenovaBatchSampler(Sampler):
+    """Wraps another sampler to yield a mini-batch of indices.
+
+    Args:
+        data_source (Dataset): dataset to sample from
+    """
+
+    def __init__(self, cfg, device: Union[int, torch.device], gpu_capacity_scaller: float, spec_header, bin_boarders: List, model, shuffle=True) -> None:
+        super().__init__(data_source=None)
+        self.cfg = cfg
+        self.bin_boarders = np.array(bin_boarders)
+        self.t_bzs_proportion = ((self.bin_boarders[1:]/self.bin_boarders[1])**2)[::-1]
+        self.gpu_capacity = torch.cuda.get_device_properties(device).total_memory*gpu_capacity_scaller
+        self.shuffle = shuffle
+        self.spec_header = spec_header
+        self.model_mem = sum([param.nelement() for param in model.parameters()])*4*4
+        self.encoder_mem = EncoderMem(cfg)
+        if 'decoder' in cfg: self.decoder_mem = DecoderMem(cfg)
 
     def __iter__(self):
         if self.shuffle: self.spec_header = self.spec_header.sample(frac=1)
@@ -71,11 +96,21 @@ class GenovaBatchSampler(Sampler):
             batch_num = i-self.bins_readpointer[bin_index]+1
             edge_num += spec_index['Edge Num']
             path_num += spec_index['Relation Num']
-            node_consumer = self.node_sparse * max_node * batch_num * 30 + self.node * max_node * batch_num
-            edge_consumer = self.edge_matrix * max_node**2 * batch_num + self.edge_sparse * edge_num
-            path_consumer = self.path_matrix * max_node**2 * batch_num + self.path_sparse * path_num
-            relation_cosumer = self.relation_matrix * max_node**2 * batch_num + self.relation_ffn * max_node * batch_num
-            theo = node_consumer + edge_consumer + path_consumer + relation_cosumer
+            
+            encoder_node_consumer = self.encoder_mem.node_sparse * max_node * batch_num * 30 + self.encoder_mem.node * max_node * batch_num
+            encoder_edge_consumer = self.encoder_mem.edge_matrix * max_node**2 * batch_num + self.encoder_mem.edge_sparse * edge_num
+            encoder_path_consumer = self.encoder_mem.path_matrix * max_node**2 * batch_num + self.encoder_mem.path_sparse * path_num
+            encoder_relation_cosumer = self.encoder_mem.relation_matrix * max_node**2 * batch_num + self.encoder_mem.relation_ffn * max_node * batch_num
+            encoder_theo = encoder_node_consumer + encoder_edge_consumer + encoder_path_consumer + encoder_relation_cosumer
+            if 'decoder' in self.cfg:
+                decoder_self_relation = self.decoder_mem.self_relation_matrix * 32**2 * batch_num
+                decoder_trans_relation = self.decoder_mem.self_relation_matrix * 32*max_node * batch_num
+                decoder_ffn = (self.decoder_mem.self_relation_linear+self.decoder_mem.trans_relation_linear+self.decoder_mem.relation_ffn) * 32 * batch_num
+                decoder_theo = decoder_self_relation+decoder_trans_relation+decoder_ffn
+                theo = encoder_theo + decoder_theo + self.model_mem
+            else:
+                theo = encoder_theo + self.model_mem
+            
             if theo>self.gpu_capacity:
                 candidate_batch_size = i-self.bins_readpointer[bin_index]
                 if candidate_batch_size==0: #如果显卡内存容量一条数据都放不了就直接跳过

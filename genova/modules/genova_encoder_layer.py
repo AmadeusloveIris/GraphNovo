@@ -114,7 +114,7 @@ class GenovaEncoderLayer(nn.Module):
         super().__init__()
         gain = encoder_layer_num**-0.5 * decoder_layer_num**-0.25
         self.relation = Relation(hidden_size, d_relation, gain)
-        self.ffn = FFNGLU(hidden_size)
+        self.ffn = FFNGLU(hidden_size, gain)
 
     def forward(self, node, edge, path, rel_mask):
         node = node + self.relation(node, edge, path, rel_mask)

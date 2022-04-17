@@ -36,4 +36,5 @@ class Genova(nn.Module):
             query_node = self.query_node_linear(query_node)
             graph_node = self.graph_node_linear(graph_node).transpose(1,2)
             graph_probability = query_node@graph_node
+            graph_probability = graph_probability+decoder_input['trans_mask'].squeeze(-1)
             return graph_probability
