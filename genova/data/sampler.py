@@ -61,17 +61,20 @@ class GenovaBatchSampler(Sampler):
         data_source (Dataset): dataset to sample from
     """
 
-    def __init__(self, cfg, device: Union[int, torch.device], gpu_capacity_scaller: float, spec_header, bin_boarders: List, model, shuffle=True) -> None:
+    def __init__(self, cfg, device: Union[int, torch.device], 
+                 gpu_capacity_scaller: float, spec_header, 
+                 bin_boarders: List, model, shuffle=True, 
+                 sample_time_limitation = 5000) -> Sampler:
         super().__init__(data_source=None)
         self.cfg = cfg
         self.bin_boarders = np.array(bin_boarders)
-        self.t_bzs_proportion = ((self.bin_boarders[1:]/self.bin_boarders[1])**2)[::-1]
         self.gpu_capacity = torch.cuda.get_device_properties(device).total_memory*gpu_capacity_scaller
         self.shuffle = shuffle
         self.spec_header = spec_header
         self.model_mem = sum([param.nelement() for param in model.parameters()])*4*4
         self.encoder_mem = EncoderMem(cfg)
         if 'decoder' in cfg: self.decoder_mem = DecoderMem(cfg)
+        self.t_bzs_proportion = self.bzs_sampling(spec_header, sample_time_limitation)
 
     def __iter__(self):
         if self.shuffle: self.spec_header = self.spec_header.sample(frac=1)
@@ -79,7 +82,7 @@ class GenovaBatchSampler(Sampler):
         return self
 
     def __next__(self):
-        if self.bins_readpointer.sum()>=len(self.spec_header): raise StopIteration
+        if self.bins_readpointer.sum()>=self.bin_len.sum(): raise StopIteration
         # 警告： 由于分bucket，并且每个bucket的batch size不同，所以不能直接以每个bucket中剩余的数据量做为权重，
         # 需要考虑个bucket大致的batch size的比例，并加以修正。否则将导致抽取不均衡，平均来看，batch size大的bucket
         # 将会被先抽。
@@ -141,3 +144,63 @@ class GenovaBatchSampler(Sampler):
             self.spec_header['Node Number']<=self.bin_boarders[i+1])] for i in range(len(self.bin_boarders)-1)]
         self.bin_len = np.array([len(bin_index) for bin_index in self.bins])
         self.bins_readpointer = np.zeros(len(self.bin_boarders)-1,dtype=int)
+    
+    def bzs_sampling(self,spec_header,sample_time_limitation):
+        spec_header = spec_header.sample(frac=1)
+        bins = [spec_header[np.logical_and(spec_header['Node Number']>self.bin_boarders[i], \
+            spec_header['Node Number']<=self.bin_boarders[i+1])] for i in range(len(self.bin_boarders)-1)]
+        bins_readpointer = np.zeros(len(self.bin_boarders)-1,dtype=int)
+
+        sample_num = np.zeros(len(bins))
+        sample_count = np.zeros(len(bins))
+
+        for bin_index in range(len(bins)):
+            bin = bins[bin_index]
+            i = bins_readpointer[bin_index]
+            sample_time = 0
+            max_node = 0
+            edge_num = 0
+            path_num = 0
+            while sample_time<sample_time_limitation:
+                if i >= len(bin): break
+                sample_time += 1
+                spec_index=bin.iloc[i]
+                if spec_index['Node Number']>max_node: max_node = spec_index['Node Number']
+                batch_num = i-bins_readpointer[bin_index]+1
+                edge_num += spec_index['Edge Num']
+                path_num += spec_index['Relation Num']
+                
+                encoder_node_consumer = self.encoder_mem.node_sparse * max_node * batch_num * 30 + self.encoder_mem.node * max_node * batch_num
+                encoder_edge_consumer = self.encoder_mem.edge_matrix * max_node**2 * batch_num + self.encoder_mem.edge_sparse * edge_num
+                encoder_path_consumer = self.encoder_mem.path_matrix * max_node**2 * batch_num + self.encoder_mem.path_sparse * path_num
+                encoder_relation_cosumer = self.encoder_mem.relation_matrix * max_node**2 * batch_num + self.encoder_mem.relation_ffn * max_node * batch_num
+                encoder_theo = encoder_node_consumer + encoder_edge_consumer + encoder_path_consumer + encoder_relation_cosumer
+                if 'decoder' in self.cfg:
+                    decoder_self_relation = self.decoder_mem.self_relation_matrix * 32**2 * batch_num
+                    decoder_trans_relation = self.decoder_mem.self_relation_matrix * 32*max_node * batch_num
+                    decoder_ffn = (self.decoder_mem.self_relation_linear+self.decoder_mem.trans_relation_linear+self.decoder_mem.relation_ffn) * 32 * batch_num
+                    decoder_theo = decoder_self_relation+decoder_trans_relation+decoder_ffn
+                    theo = encoder_theo + decoder_theo + self.model_mem
+                else:
+                    theo = encoder_theo + self.model_mem
+                if theo>self.gpu_capacity:
+                    candidate_batch_size = i-bins_readpointer[bin_index]
+                    if candidate_batch_size==0: #如果显卡内存容量一条数据都放不了就直接跳过
+                        i += 1
+                        bins_readpointer[bin_index] = i
+                        max_node = 0
+                        edge_num = 0
+                        path_num = 0
+                        continue
+                    else:
+                        if candidate_batch_size//8 > 0: i = i-candidate_batch_size%8 #强制batch size可以被8整除，优化计算效率(虽然我测试过没什么用)
+                        index = bin.iloc[bins_readpointer[bin_index]:i].index
+                        bins_readpointer[bin_index] = i
+                        sample_num[bin_index] += len(index)
+                        sample_count[bin_index] += 1
+                        max_node = 0
+                        edge_num = 0
+                        path_num = 0
+                else: 
+                    i += 1
+        return sample_num/sample_count
