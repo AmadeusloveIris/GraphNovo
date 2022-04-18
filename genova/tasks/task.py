@@ -22,7 +22,8 @@ class Task:
 
     def initialize(self,train_spec_header,train_dataset_dir,val_spec_header,val_dataset_dir):
         self.model_ori = genova.models.Genova(self.cfg)
-        self.loss_fn = nn.KLDivLoss(reduction='batchmean')
+        self.train_loss_fn = nn.KLDivLoss(reduction='batchmean')
+        self.eval_loss_fn = nn.KLDivLoss(reduction='sum')
         self.optimizer = optim.AdamW(self.model_ori.parameters(), lr=self.cfg.train.lr)
         self.scaler = GradScaler()
         persistent_file_name = os.path.join(self.model_save_dir,self.cfg.wandb.project+'.pt')
@@ -36,7 +37,7 @@ class Task:
         wandb.watch(self.model_ori,log='all')
 
         self.train_dl = self.train_loader(train_spec_header,train_dataset_dir)
-        self.val_dl = self.val_loader(val_spec_header,val_dataset_dir)
+        self.eval_dl = self.eval_loader(val_spec_header,val_dataset_dir)
         
         assert self.distributed==dist.is_initialized()
         if self.distributed: self.model = DDP(self.model_ori, device_ids=[self.device])
@@ -50,28 +51,41 @@ class Task:
         train_dl = genova.data.DataPrefetcher(train_dl,self.device)
         return train_dl
 
-    def val_loader(self,val_spec_header,val_dataset_dir):
+    def eval_loader(self,val_spec_header,val_dataset_dir):
         ds = genova.data.GenovaDataset(self.cfg,spec_header=val_spec_header,dataset_dir_path=val_dataset_dir)
         sampler = genova.data.GenovaBatchSampler(self.cfg,self.device,2,val_spec_header,[0,128,256,512,768],self.model_ori)
         collate_fn = genova.data.GenovaCollator(self.cfg)
-        val_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True,num_workers=(cpu_count()-1)//4)
-        val_dl = genova.data.DataPrefetcher(val_dl,self.device)
-        return val_dl
+        eval_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True,num_workers=(cpu_count()-1)//4)
+        eval_dl = genova.data.DataPrefetcher(eval_dl,self.device)
+        return eval_dl
 
     def train(self):
         total_step = 0
         for epoch in range(0, self.cfg.train.total_epoch):
-            for encoder_input, decoder_input, graph_probability, label, label_mask in self.dl:
+            for encoder_input, decoder_input, graph_probability, label, label_mask in self.train_dl:
+                total_step += 1
                 if total_step%self.cfg.train.detect_period == 1: loss_cum = 0
-                elif total_step%self.cfg.train.detect_period == 0 and total_step != 0: yield loss_cum, total_step
                 self.optimizer.zero_grad()
                 with autocast():
                     output = self.model(encoder_input=encoder_input, decoder_input=decoder_input, graph_probability=graph_probability)
                     output = output.log_softmax(-1)
-                    loss = self.loss_fn(output[label_mask],label[label_mask])
+                    loss = self.train_loss_fn(output[label_mask],label[label_mask])
                 assert loss.item()!=float('nan')
-                loss_cum += loss.item()
+                loss_cum += loss
                 self.scaler.scale(loss).backward()
                 self.scaler.step(self.optimizer)
                 self.scaler.update()
-                total_step += 1
+                if total_step%self.cfg.train.detect_period == 0: yield loss_cum/self.cfg.train.detect_period, total_step
+
+    def eval(self) -> float:
+        loss_cum = 0
+        total_seq_len = 0
+        for encoder_input, decoder_input, graph_probability, label, label_mask in self.eval_dl:
+            with torch.no_grad():
+                output = self.model(encoder_input=encoder_input, decoder_input=decoder_input, graph_probability=graph_probability)
+                output = output.log_softmax(-1)
+                loss = self.eval_loss_fn(output[label_mask],label[label_mask])
+            assert loss.item()!=float('nan')
+            loss_cum += loss
+            total_seq_len += label_mask.sum()
+        return loss_cum, total_seq_len
