@@ -21,7 +21,7 @@ class Task:
         else: self.device = torch.cuda.device('cuda') 
 
     def initialize(self,train_spec_header,train_dataset_dir,val_spec_header,val_dataset_dir):
-        self.model_ori = genova.models.Genova(self.cfg)
+        self.model = genova.models.Genova(self.cfg)
         self.train_loss_fn = nn.KLDivLoss(reduction='batchmean')
         self.eval_loss_fn = nn.KLDivLoss(reduction='sum')
         self.optimizer = optim.AdamW(self.model_ori.parameters(), lr=self.cfg.train.lr)
@@ -29,19 +29,18 @@ class Task:
         persistent_file_name = os.path.join(self.model_save_dir,self.cfg.wandb.project+'.pt')
         if os.path.exists(persistent_file_name):
             checkpoint = torch.load(persistent_file_name)
-            self.model_ori.load_state_dict(checkpoint['model_state_dict'])
+            self.model.load_state_dict(checkpoint['model_state_dict'])
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-
-        wandb.init(entity=self.cfg.wandb.entity, project=self.cfg.wandb.project)
-        wandb.config = OmegaConf.to_container(self.cfg)
-        wandb.watch(self.model_ori,log='all')
 
         self.train_dl = self.train_loader(train_spec_header,train_dataset_dir)
         self.eval_dl = self.eval_loader(val_spec_header,val_dataset_dir)
         
         assert self.distributed==dist.is_initialized()
-        if self.distributed: self.model = DDP(self.model_ori, device_ids=[self.device])
-        else: self.model = self.model_ori
+        if self.distributed: self.model = DDP(self.model, device_ids=[self.device])
+
+        wandb.init(entity=self.cfg.wandb.entity, project=self.cfg.wandb.project)
+        wandb.config = OmegaConf.to_container(self.cfg)
+        wandb.watch(self.model,log='all')
 
     def train_loader(self,train_spec_header,train_dataset_dir):
         ds = genova.data.GenovaDataset(self.cfg,spec_header=train_spec_header,dataset_dir_path=train_dataset_dir)

@@ -12,9 +12,8 @@ class GenovaDataset(Dataset):
         self.cfg = cfg
         self.spec_header = spec_header
         self.dataset_dir_path = dataset_dir_path
-        if cfg.task == 'sequence_generation' or cfg.task == 'optimum_path_sequence': 
-            assert aa_datablock_dict
-            self.aa_datablock_dict = aa_datablock_dict
+        assert aa_datablock_dict or cfg.task == 'node_classification'
+        self.aa_datablock_dict = aa_datablock_dict
 
     def __getitem__(self, idx):
         if torch.is_tensor(idx): idx = idx.tolist()
@@ -43,7 +42,7 @@ class GenovaDataset(Dataset):
             return spec, target
         
         elif self.cfg.task == 'optimum_path':
-            trans_mask = torch.Tensor(self.trans_mask_optimum_path(graph_label))
+            trans_mask = self.trans_mask_optimum_path(node_mass, graph_label, spec['rel_input']['dist'])
             graph_probability = torch.Tensor(self.graph_probability_gen(graph_label))
             tgt = {}
             tgt['tgt'] = graph_probability[:-1]
@@ -62,13 +61,15 @@ class GenovaDataset(Dataset):
             trans_mask[i,:board] = -float('inf')
         return trans_mask
     
-    def trans_mask_optimum_path(self,graph_label):
-        graph_label = graph_label[1:-1]
-        trans_mask = torch.zeros((graph_label.shape[0]+1,graph_label.shape[1]))
-        trans_mask[0,0] = -float('inf')
-        for i, node_pos in enumerate(graph_label,start=1):
-            trans_mask[i,:torch.where(node_pos)[0].max().item()] = -float('inf')
-        return trans_mask
+    def trans_mask_optimum_path(self, node_mass, graph_label, dist):
+        node_num = node_mass.size
+        edge_mask = torch.zeros(node_num,node_num,dtype=bool)
+        for x,y in enumerate(node_mass.searchsorted(node_mass+max(self.aa_datablock_dict.values())+0.04)):
+            edge_mask[x,y:] = True
+        edge_mask = torch.logical_or(edge_mask,dist!=0)
+        trans_mask=((graph_label@edge_mask.int())!=0).bool()
+        trans_mask = torch.where(trans_mask,0.0,-float('inf'))
+        return trans_mask[:-1]
     
     def seq2seqblock(self, seq, graph_label):
         seq_block = []
