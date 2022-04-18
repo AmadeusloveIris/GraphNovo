@@ -74,7 +74,7 @@ class GenovaBatchSampler(Sampler):
         self.model_mem = sum([param.nelement() for param in model.parameters()])*4*4
         self.encoder_mem = EncoderMem(cfg)
         if 'decoder' in cfg: self.decoder_mem = DecoderMem(cfg)
-        self.t_bzs_proportion = self.bzs_sampling(sample_time_limitation)
+        if shuffle: self.t_bzs_proportion = self.bzs_sampling(sample_time_limitation)
 
     def __iter__(self):
         if self.shuffle: self.spec_header = self.spec_header.sample(frac=1)
@@ -86,8 +86,13 @@ class GenovaBatchSampler(Sampler):
         # 警告： 由于分bucket，并且每个bucket的batch size不同，所以不能直接以每个bucket中剩余的数据量做为权重，
         # 需要考虑个bucket大致的batch size的比例，并加以修正。否则将导致抽取不均衡，平均来看，batch size大的bucket
         # 将会被先抽。
-        bin_index = choices([i for i in range(self.bin_len.size)], \
-                            weights=(self.bin_len-(self.bins_readpointer+1))/self.t_bzs_proportion)[0]
+        if self.shuffle:
+            bin_index = choices([i for i in range(self.bin_len.size)], \
+                                weights=(self.bin_len-(self.bins_readpointer+1))/self.t_bzs_proportion)[0]
+        else:
+            bin_index = choices([i for i in range(self.bin_len.size)], \
+                                weights=(self.bin_len-(self.bins_readpointer+1)))[0]
+
         bin = self.bins[bin_index]
         max_node = 0
         edge_num = 0

@@ -1,12 +1,16 @@
-import wandb
+import os
 import hydra
-from omegaconf import OmegaConf
-@hydra.main(config_path="configs", config_name='config.yaml')
-def config_print(cfg):
-    wandb.init(entity=cfg.wandb.entity, project=cfg.wandb.project)
-    print(OmegaConf.to_yaml(cfg))
-    print()
-    print(OmegaConf.to_yaml(cfg.encoder))
+import torch
+import genova
+from omegaconf import open_dict
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 
-if __name__ == '__main__':
-    config_print()
+from omegaconf import DictConfig, OmegaConf
+
+@hydra.main(config_path="configs", config_name="config")
+def my_app(cfg : DictConfig) -> None:
+    print(OmegaConf.to_yaml(cfg))
+
+if __name__ == "__main__":
+    my_app()

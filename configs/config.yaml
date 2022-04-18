@@ -2,5 +2,10 @@ defaults:
   - preprocessing: all_graph
   - encoder: light
   - decoder: light
+  - train: train
   - _self_
+
+wandb:
+  entity: genova
+  project: 
 

@@ -1,7 +1,7 @@
-max_charge: 20
-max_subion_num: 25
-max_seq_len: 32
+max_charge: 100
+max_subion_num: 100
+max_seq_len: 50
 d_ori_node: 10
 d_ori_edge: 1
 edge_type_num: 50150
-path_max_length: 100
+path_max_length: 500
