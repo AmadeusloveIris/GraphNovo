@@ -11,10 +11,12 @@ from torch.cuda.amp import autocast, GradScaler
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 class Task:
-    def __init__(self, cfg, model_save_dir, distributed=True):
+    def __init__(self, cfg, model_save_dir, aa_datablock_dict=None, distributed=True):
         self.cfg = cfg
         self.distributed = distributed
         self.model_save_dir = model_save_dir
+        assert aa_datablock_dict or cfg.task == 'node_classification'
+        self.aa_datablock_dict = aa_datablock_dict
         if self.distributed:
             dist.init_process_group(backend='nccl')
             self.device = torch.cuda.device(int(os.environ["LOCAL_RANK"]))
@@ -24,7 +26,7 @@ class Task:
         self.model = genova.models.Genova(self.cfg)
         self.train_loss_fn = nn.KLDivLoss(reduction='batchmean')
         self.eval_loss_fn = nn.KLDivLoss(reduction='sum')
-        self.optimizer = optim.AdamW(self.model_ori.parameters(), lr=self.cfg.train.lr)
+        self.optimizer = optim.AdamW(self.model.parameters(), lr=self.cfg.train.lr)
         self.scaler = GradScaler()
         persistent_file_name = os.path.join(self.model_save_dir,self.cfg.wandb.project+'.pt')
         if os.path.exists(persistent_file_name):
@@ -43,7 +45,7 @@ class Task:
         wandb.watch(self.model,log='all')
 
     def train_loader(self,train_spec_header,train_dataset_dir):
-        ds = genova.data.GenovaDataset(self.cfg,spec_header=train_spec_header,dataset_dir_path=train_dataset_dir)
+        ds = genova.data.GenovaDataset(self.cfg,spec_header=train_spec_header,dataset_dir_path=train_dataset_dir,aa_datablock_dict=self.aa_datablock_dict)
         sampler = genova.data.GenovaBatchSampler(self.cfg,self.device,0.95,train_spec_header,[0,128,256,512],self.model_ori)
         collate_fn = genova.data.GenovaCollator(self.cfg)
         train_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True,num_workers=(cpu_count()-1)//4,prefetch_factor=4)
@@ -51,7 +53,7 @@ class Task:
         return train_dl
 
     def eval_loader(self,val_spec_header,val_dataset_dir):
-        ds = genova.data.GenovaDataset(self.cfg,spec_header=val_spec_header,dataset_dir_path=val_dataset_dir)
+        ds = genova.data.GenovaDataset(self.cfg,spec_header=val_spec_header,dataset_dir_path=val_dataset_dir,aa_datablock_dict=self.aa_datablock_dict)
         sampler = genova.data.GenovaBatchSampler(self.cfg,self.device,2,val_spec_header,[0,128,256,512,768],self.model_ori)
         collate_fn = genova.data.GenovaCollator(self.cfg)
         eval_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True,num_workers=(cpu_count()-1)//4)
