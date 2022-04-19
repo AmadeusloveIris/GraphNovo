@@ -8,9 +8,16 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 from omegaconf import DictConfig, OmegaConf
 
-@hydra.main(config_path="configs", config_name="config")
-def my_app(cfg : DictConfig) -> None:
-    print(OmegaConf.to_yaml(cfg))
+dist.init_process_group(backend='nccl')
+local_rank = int(os.environ['LOCAL_RANK'])
+rank=dist.get_rank()*torch.ones(1)
 
-if __name__ == "__main__":
-    my_app()
+rank = rank.to(local_rank)
+
+all_rank = dist.reduce(rank,0)
+
+if dist.get_rank()==0:
+    print("all_rank:",all_rank)
+    print("rank:",rank)
+
+#print(os.environ["LOCAL_WORLD_SIZE"])
