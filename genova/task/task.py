@@ -19,13 +19,15 @@ class Task:
         self.aa_datablock_dict = aa_datablock_dict
         if self.distributed:
             dist.init_process_group(backend='nccl')
-            self.device = torch.cuda.device(int(os.environ["LOCAL_RANK"]))
-        else: self.device = torch.cuda.device('cuda') 
+            self.device = torch.device(int(os.environ["LOCAL_RANK"]))
+        else: self.device = torch.device('cuda') 
 
     def initialize(self,train_spec_header,train_dataset_dir,val_spec_header,val_dataset_dir):
-        self.model = genova.models.Genova(self.cfg)
+        self.model = genova.models.Genova(self.cfg).to(self.device)
         self.train_loss_fn = nn.KLDivLoss(reduction='batchmean')
         self.eval_loss_fn = nn.KLDivLoss(reduction='sum')
+        assert self.distributed==dist.is_initialized()
+        if self.distributed: self.model = DDP(self.model, device_ids=[self.device])
         self.optimizer = optim.AdamW(self.model.parameters(), lr=self.cfg.train.lr)
         self.scaler = GradScaler()
         persistent_file_name = os.path.join(self.model_save_dir,self.cfg.wandb.project+'.pt')
@@ -36,27 +38,33 @@ class Task:
 
         self.train_dl = self.train_loader(train_spec_header,train_dataset_dir)
         self.eval_dl = self.eval_loader(val_spec_header,val_dataset_dir)
-        
-        assert self.distributed==dist.is_initialized()
-        if self.distributed: self.model = DDP(self.model, device_ids=[self.device])
 
-        wandb.init(entity=self.cfg.wandb.entity, project=self.cfg.wandb.project)
-        wandb.config = OmegaConf.to_container(self.cfg)
-        wandb.watch(self.model,log='all')
+        if self.distributed and dist.get_rank() == 0:
+            wandb.init(entity=self.cfg.wandb.entity, project=self.cfg.wandb.project)
+            wandb.config = OmegaConf.to_container(self.cfg)
+            wandb.watch(self.model.module,log='all')
 
     def train_loader(self,train_spec_header,train_dataset_dir):
         ds = genova.data.GenovaDataset(self.cfg,spec_header=train_spec_header,dataset_dir_path=train_dataset_dir,aa_datablock_dict=self.aa_datablock_dict)
-        sampler = genova.data.GenovaBatchSampler(self.cfg,self.device,0.95,train_spec_header,[0,128,256,512],self.model_ori)
+        sampler = genova.data.GenovaBatchSampler(self.cfg,self.device,1,train_spec_header,[0,128,256,512],self.model)
         collate_fn = genova.data.GenovaCollator(self.cfg)
-        train_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True,num_workers=(cpu_count()-1)//4,prefetch_factor=4)
+        if self.distributed:
+            train_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True,
+            num_workers=(cpu_count()-1)//int(os.environ["LOCAL_WORLD_SIZE"]),prefetch_factor=4)
+        else:
+            train_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True)
         train_dl = genova.data.DataPrefetcher(train_dl,self.device)
         return train_dl
 
     def eval_loader(self,val_spec_header,val_dataset_dir):
         ds = genova.data.GenovaDataset(self.cfg,spec_header=val_spec_header,dataset_dir_path=val_dataset_dir,aa_datablock_dict=self.aa_datablock_dict)
-        sampler = genova.data.GenovaBatchSampler(self.cfg,self.device,2,val_spec_header,[0,128,256,512,768],self.model_ori)
+        sampler = genova.data.GenovaBatchSampler(self.cfg,self.device,2,val_spec_header,[0,128,256,512],self.model)
         collate_fn = genova.data.GenovaCollator(self.cfg)
-        eval_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True,num_workers=(cpu_count()-1)//4)
+        if self.distributed:
+            eval_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True,
+            num_workers=(cpu_count()-1)//int(os.environ["LOCAL_WORLD_SIZE"]))
+        else:
+            eval_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True)
         eval_dl = genova.data.DataPrefetcher(eval_dl,self.device)
         return eval_dl
 
@@ -71,7 +79,7 @@ class Task:
                     output = self.model(encoder_input=encoder_input, decoder_input=decoder_input, graph_probability=graph_probability)
                     output = output.log_softmax(-1)
                     loss = self.train_loss_fn(output[label_mask],label[label_mask])
-                assert loss.item()!=float('nan')
+                assert loss.item()!=float('nan') and loss.item()!=float('inf')
                 loss_cum += loss
                 self.scaler.scale(loss).backward()
                 self.scaler.step(self.optimizer)
@@ -89,4 +97,8 @@ class Task:
             assert loss.item()!=float('nan')
             loss_cum += loss
             total_seq_len += label_mask.sum()
+        if self.distributed:
+            dist.barrier()
+            dist.reduce(loss_cum,0)
+            dist.reduce(total_seq_len,0)
         return loss_cum, total_seq_len
