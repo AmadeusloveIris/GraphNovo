@@ -22,7 +22,7 @@ class Task:
             self.device = torch.device(int(os.environ["LOCAL_RANK"]))
         else: self.device = torch.device('cuda') 
 
-    def initialize(self,train_spec_header,train_dataset_dir,val_spec_header,val_dataset_dir):
+    def initialize(self, *, train_spec_header,train_dataset_dir,val_spec_header,val_dataset_dir):
         self.model = genova.models.Genova(self.cfg).to(self.device)
         self.train_loss_fn = nn.KLDivLoss(reduction='batchmean')
         self.eval_loss_fn = nn.KLDivLoss(reduction='sum')
@@ -80,7 +80,7 @@ class Task:
                     output = output.log_softmax(-1)
                     loss = self.train_loss_fn(output[label_mask],label[label_mask])
                 assert loss.item()!=float('nan') and loss.item()!=float('inf')
-                loss_cum += loss
+                loss_cum += loss.item()
                 self.scaler.scale(loss).backward()
                 self.scaler.step(self.optimizer)
                 self.scaler.update()
@@ -101,4 +101,4 @@ class Task:
             dist.barrier()
             dist.reduce(loss_cum,0)
             dist.reduce(total_seq_len,0)
-        return loss_cum, total_seq_len
+        return (loss_cum/total_seq_len).item()

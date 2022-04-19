@@ -19,8 +19,8 @@ def main(cfg: DictConfig)->None:
     task = genova.task.Task(cfg,'/home/z37mao/Genova/save', aa_datablock_dict=aa_datablock_dict, distributed=True)
     task.initialize(spec_header,'/home/z37mao/',spec_header,'/home/z37mao/')
     for loss_train, total_step in task.train():
-        loss_eval, total_seq_len = task.eval()
-        wandb.log({'train_loss':loss_train, 'eval_loss': loss_eval/total_seq_len}, step=total_step)
+        loss_eval = task.eval()
+        wandb.log({'train_loss':loss_train, 'eval_loss': loss_eval}, step=total_step)
 
 if __name__=='__main__':
     main()
