@@ -11,7 +11,7 @@ from torch.cuda.amp import autocast, GradScaler
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 class Task:
-    def __init__(self, cfg, model_save_dir, aa_datablock_dict=None, distributed=True):
+    def __init__(self, cfg, model_save_dir='./save', aa_datablock_dict=None, distributed=True):
         self.cfg = cfg
         self.distributed = distributed
         self.model_save_dir = model_save_dir
@@ -30,19 +30,14 @@ class Task:
         if self.distributed: self.model = DDP(self.model, device_ids=[self.device])
         self.optimizer = optim.AdamW(self.model.parameters(), lr=self.cfg.train.lr)
         self.scaler = GradScaler()
-        persistent_file_name = os.path.join(self.model_save_dir,self.cfg.wandb.project+'.pt')
-        if os.path.exists(persistent_file_name):
-            checkpoint = torch.load(persistent_file_name)
+        self.persistent_file_name = os.path.join(self.model_save_dir,self.cfg.wandb.project+'.pt')
+        if os.path.exists(self.persistent_file_name):
+            checkpoint = torch.load(self.persistent_file_name)
             self.model.load_state_dict(checkpoint['model_state_dict'])
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
         self.train_dl = self.train_loader(train_spec_header,train_dataset_dir)
         self.eval_dl = self.eval_loader(val_spec_header,val_dataset_dir)
-
-        if self.distributed and dist.get_rank() == 0:
-            wandb.init(entity=self.cfg.wandb.entity, project=self.cfg.wandb.project)
-            wandb.config = OmegaConf.to_container(self.cfg)
-            wandb.watch(self.model.module,log='all')
 
     def train_loader(self,train_spec_header,train_dataset_dir):
         ds = genova.data.GenovaDataset(self.cfg,spec_header=train_spec_header,dataset_dir_path=train_dataset_dir,aa_datablock_dict=self.aa_datablock_dict)
@@ -67,6 +62,10 @@ class Task:
             eval_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True)
         eval_dl = genova.data.DataPrefetcher(eval_dl,self.device)
         return eval_dl
+    
+    def model_save(self):
+        torch.save({'model_state_dict':self.model.module.state_dict(),
+        'optimizer_state_dict':self.optimizer.state_dict()},self.persistent_file_name)
 
     def train(self):
         total_step = 0
