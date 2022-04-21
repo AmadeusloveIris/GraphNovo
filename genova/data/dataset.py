@@ -64,7 +64,7 @@ class GenovaDataset(Dataset):
     def trans_mask_optimum_path(self, node_mass, graph_label, dist):
         node_num = node_mass.size
         edge_mask = torch.zeros(node_num,node_num,dtype=bool)
-        for x,y in enumerate(node_mass.searchsorted(node_mass+max(self.aa_datablock_dict.values())+0.04)):
+        for x,y in enumerate(node_mass.searchsorted(node_mass+max(self.aa_datablock_dict.values())-0.04)):
             edge_mask[x,y:] = True
         edge_mask = torch.logical_or(edge_mask,dist!=0)
         trans_mask=((graph_label@edge_mask.int())!=0).bool()

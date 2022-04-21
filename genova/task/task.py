@@ -1,5 +1,5 @@
 import os
-import wandb
+import math
 import torch
 import genova
 from omegaconf import OmegaConf
@@ -11,15 +11,17 @@ from torch.cuda.amp import autocast, GradScaler
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 class Task:
-    def __init__(self, cfg, model_save_dir='./save', aa_datablock_dict=None, distributed=True):
+    def __init__(self, cfg, serialized_model_path, aa_datablock_dict=None, distributed=True):
         self.cfg = cfg
         self.distributed = distributed
-        self.model_save_dir = model_save_dir
+        self.serialized_model_path = serialized_model_path
         assert aa_datablock_dict or cfg.task == 'node_classification'
         self.aa_datablock_dict = aa_datablock_dict
         if self.distributed:
             dist.init_process_group(backend='nccl')
-            self.device = torch.device(int(os.environ["LOCAL_RANK"]))
+            self.local_rank = int(os.environ["LOCAL_RANK"])
+            self.device = torch.device("cuda", self.local_rank)
+            torch.cuda.set_device(self.local_rank)
         else: self.device = torch.device('cuda') 
 
     def initialize(self, *, train_spec_header,train_dataset_dir,val_spec_header,val_dataset_dir):
@@ -27,10 +29,10 @@ class Task:
         self.train_loss_fn = nn.KLDivLoss(reduction='batchmean')
         self.eval_loss_fn = nn.KLDivLoss(reduction='sum')
         assert self.distributed==dist.is_initialized()
-        if self.distributed: self.model = DDP(self.model, device_ids=[self.device])
+        if self.distributed: self.model = DDP(self.model, device_ids=[self.local_rank], output_device=self.local_rank)
         self.optimizer = optim.AdamW(self.model.parameters(), lr=self.cfg.train.lr)
         self.scaler = GradScaler()
-        self.persistent_file_name = os.path.join(self.model_save_dir,self.cfg.wandb.project+'.pt')
+        self.persistent_file_name = os.path.join(self.serialized_model_path,self.cfg.wandb.project+'.pt')
         if os.path.exists(self.persistent_file_name):
             checkpoint = torch.load(self.persistent_file_name)
             self.model.load_state_dict(checkpoint['model_state_dict'])
@@ -41,11 +43,10 @@ class Task:
 
     def train_loader(self,train_spec_header,train_dataset_dir):
         ds = genova.data.GenovaDataset(self.cfg,spec_header=train_spec_header,dataset_dir_path=train_dataset_dir,aa_datablock_dict=self.aa_datablock_dict)
-        sampler = genova.data.GenovaBatchSampler(self.cfg,self.device,1,train_spec_header,[0,128,256,512],self.model)
+        sampler = genova.data.GenovaBatchSampler(self.cfg,self.device,0.95,train_spec_header,[0,128,256,512],self.model)
         collate_fn = genova.data.GenovaCollator(self.cfg)
         if self.distributed:
-            train_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True,
-            num_workers=(cpu_count()-1)//int(os.environ["LOCAL_WORLD_SIZE"]),prefetch_factor=4)
+            train_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True,num_workers=2)
         else:
             train_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True)
         train_dl = genova.data.DataPrefetcher(train_dl,self.device)
@@ -56,8 +57,7 @@ class Task:
         sampler = genova.data.GenovaBatchSampler(self.cfg,self.device,2,val_spec_header,[0,128,256,512],self.model)
         collate_fn = genova.data.GenovaCollator(self.cfg)
         if self.distributed:
-            eval_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True,
-            num_workers=(cpu_count()-1)//int(os.environ["LOCAL_WORLD_SIZE"]))
+            eval_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True,num_workers=2)
         else:
             eval_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True)
         eval_dl = genova.data.DataPrefetcher(eval_dl,self.device)
@@ -69,6 +69,7 @@ class Task:
 
     def train(self):
         total_step = 0
+        loss_cum = 0
         for epoch in range(0, self.cfg.train.total_epoch):
             for encoder_input, decoder_input, graph_probability, label, label_mask in self.train_dl:
                 total_step += 1
@@ -78,26 +79,29 @@ class Task:
                     output = self.model(encoder_input=encoder_input, decoder_input=decoder_input, graph_probability=graph_probability)
                     output = output.log_softmax(-1)
                     loss = self.train_loss_fn(output[label_mask],label[label_mask])
-                assert loss.item()!=float('nan') and loss.item()!=float('inf')
+                if math.isnan(loss.item()) or math.isinf(loss.item()):
+                    print('Warning, train loss is {} in step {}'.format(loss.item(),total_step))
+                    continue
                 loss_cum += loss.item()
                 self.scaler.scale(loss).backward()
                 self.scaler.step(self.optimizer)
                 self.scaler.update()
-                if total_step%self.cfg.train.detect_period == 0: yield loss_cum/self.cfg.train.detect_period, total_step
+                #if dist.get_rank()==0: print('total_step:{}, loss:{}'.format(total_step,loss.item()))
+                if total_step%self.cfg.train.detect_period == 0: yield loss_cum/self.cfg.train.detect_period, total_step, epoch
 
     def eval(self) -> float:
-        loss_cum = 0
-        total_seq_len = 0
+        loss_cum = torch.Tensor([0]).to(self.device)
+        total_seq_len = torch.Tensor([0]).to(self.device)
         for encoder_input, decoder_input, graph_probability, label, label_mask in self.eval_dl:
             with torch.no_grad():
-                output = self.model(encoder_input=encoder_input, decoder_input=decoder_input, graph_probability=graph_probability)
-                output = output.log_softmax(-1)
-                loss = self.eval_loss_fn(output[label_mask],label[label_mask])
-            assert loss.item()!=float('nan')
-            loss_cum += loss
-            total_seq_len += label_mask.sum()
+                with autocast():
+                    output = self.model(encoder_input=encoder_input, decoder_input=decoder_input, graph_probability=graph_probability)
+                    output = output.log_softmax(-1)
+                    loss = self.eval_loss_fn(output[label_mask],label[label_mask])
+                loss_cum += loss
+                total_seq_len += label_mask.sum()
         if self.distributed:
             dist.barrier()
-            dist.reduce(loss_cum,0)
-            dist.reduce(total_seq_len,0)
+            dist.all_reduce(loss_cum)
+            dist.all_reduce(total_seq_len)
         return (loss_cum/total_seq_len).item()

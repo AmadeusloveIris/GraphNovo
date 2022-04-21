@@ -70,14 +70,13 @@ class GenovaBatchSampler(Sampler):
         self.bin_boarders = np.array(bin_boarders)
         self.gpu_capacity = torch.cuda.get_device_properties(device).total_memory*gpu_capacity_scaller
         self.shuffle = shuffle
-        self.spec_header = spec_header
+        self.spec_header_ori = spec_header
         self.model_mem = sum([param.nelement() for param in model.parameters()])*4*4
         self.encoder_mem = EncoderMem(cfg)
         if 'decoder' in cfg: self.decoder_mem = DecoderMem(cfg)
         if shuffle: self.t_bzs_proportion = self.bzs_sampling(sample_time_limitation)
 
     def __iter__(self):
-        if self.shuffle: self.spec_header = self.spec_header.sample(frac=1)
         self.generate_bins()
         return self
 
@@ -143,15 +142,16 @@ class GenovaBatchSampler(Sampler):
         return len(self.spec_header)
 
     def generate_bins(self):
-        if self.shuffle: self.spec_header.sample(frac=1)
-        if dist.is_initialized(): self.spec_header = self.spec_header.iloc[dist.get_rank()::dist.get_world_size()] # subset of dataset for ddp
+        if self.shuffle: self.spec_header_ori = self.spec_header_ori.sample(frac=1,random_state=0)
+        if dist.is_initialized(): self.spec_header = self.spec_header_ori.iloc[dist.get_rank()::dist.get_world_size()] # subset of dataset for ddp
+        else: self.spec_header = self.spec_header_ori
         self.bins = [self.spec_header[np.logical_and(self.spec_header['Node Number']>self.bin_boarders[i], \
             self.spec_header['Node Number']<=self.bin_boarders[i+1])] for i in range(len(self.bin_boarders)-1)]
         self.bin_len = np.array([len(bin_index) for bin_index in self.bins])
         self.bins_readpointer = np.zeros(len(self.bin_boarders)-1,dtype=int)
     
     def bzs_sampling(self,sample_time_limitation):
-        spec_header = self.spec_header.sample(frac=1)
+        spec_header = self.spec_header_ori.sample(frac=1)
         bins = [spec_header[np.logical_and(spec_header['Node Number']>self.bin_boarders[i], \
             spec_header['Node Number']<=self.bin_boarders[i+1])] for i in range(len(self.bin_boarders)-1)]
         bins_readpointer = np.zeros(len(self.bin_boarders)-1,dtype=int)
