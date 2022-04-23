@@ -6,13 +6,6 @@ import torch.distributed as dist
 from omegaconf import DictConfig, OmegaConf
 from genova.utils.BasicClass import Residual_seq
 
-from itertools import combinations_with_replacement
-aa_datablock_dict = {}
-aalist = Residual_seq.output_aalist()
-for num in range(1,7):
-    for i in combinations_with_replacement(aalist,num):
-        aa_datablock_dict[i] = Residual_seq(i).mass
-
 def init_wandb(cfg):
     run = wandb.init(entity=cfg.wandb.entity, 
             project=cfg.wandb.project, name=cfg.wandb.name, 
@@ -24,7 +17,8 @@ def main(cfg: DictConfig)->None:
     train_spec_header = pd.read_csv('/data/genova_data_filted/genova_filted_dataset_index.csv',low_memory=False,index_col='Spec Index')
     eval_spec_header = pd.read_csv('/data/genova_data/genova_dataset_index.csv',low_memory=False,index_col='Spec Index')
     eval_spec_header = eval_spec_header[eval_spec_header['Experiment Name']=='Plasma']
-    task = genova.task.Task(cfg,serialized_model_path=cfg.train.serialized_model_path,aa_datablock_dict=aa_datablock_dict)
+    eval_spec_header = eval_spec_header[eval_spec_header['Annotated Sequence'].str.len()<=32]
+    task = genova.task.Task(cfg,serialized_model_path=cfg.train.serialized_model_path)
     task.initialize(train_spec_header=train_spec_header,train_dataset_dir='/data/genova_data_filted',val_spec_header=eval_spec_header,val_dataset_dir='/data/genova_data')
     if dist.is_initialized() and dist.get_rank()==0: run = init_wandb(cfg)
     best_loss = float('inf')

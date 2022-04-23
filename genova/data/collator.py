@@ -7,26 +7,27 @@ class GenovaCollator(object):
         self.cfg = cfg
 
     def __call__(self, batch):
-        if self.cfg.task == 'optimum_path':
+        if self.cfg.task == 'optimum_path' or self.cfg.task == 'sequence_generation':
             spec = [record[0] for record in batch]
             tgt = [record[1] for record in batch]
             label = [record[2] for record in batch]
             encoder_input = self.encoder_collate(spec)
-            decoder_input, graph_probability = self.decoder_collate(tgt)
+            decoder_input, tgt = self.decoder_collate(tgt)
             label, label_mask = self.label_collate(label)
-            return encoder_input, decoder_input, graph_probability, label, label_mask
-        
-        elif self.cfg.task == 'sequence_generation':
-            raise NotImplementedError
+            return encoder_input, decoder_input, tgt, label, label_mask
         
         elif self.cfg.task == 'node_classification':
-            raise NotImplementedError
+            spec = [record[0] for record in batch]
+            label = [record[1] for record in batch]
+            encoder_input = self.encoder_collate(spec)
+            label, label_mask = self.label_collate(label)
+            return encoder_input, label, label_mask
     
     def decoder_collate(self, decoder_input):
         if self.cfg.task == 'optimum_path':
             tgts_list = [record['tgt'] for record in decoder_input]
             trans_mask_list = [record['trans_mask'] for record in decoder_input]
-            shape_list = np.array([tgt.shape for tgt in tgts_list])
+            shape_list = np.array([tgt.shape for tgt in trans_mask_list])
             seqdblock_max = shape_list[:,0].max()
             node_max = shape_list[:,1].max()
             
@@ -43,6 +44,26 @@ class GenovaCollator(object):
                              'self_mask': (-float('inf')*torch.ones(seqdblock_max,seqdblock_max)) \
                              .triu(diagonal=1).unsqueeze(-1)}
             return decoder_input, graph_probability
+
+        elif self.cfg.task == 'sequence_generation':
+            tgts_list = [record['tgt'] for record in decoder_input]
+            trans_mask_list = [record['trans_mask'] for record in decoder_input]
+            shape_list = np.array([tgt.shape for tgt in trans_mask_list])
+            seqdblock_max = shape_list[:,0].max()
+            node_max = shape_list[:,1].max()
+            
+            seqs = []
+            trans_mask = []
+            for i in range(len(tgts_list)):
+                seqs.append(pad(tgts_list[i],[0,seqdblock_max-shape_list[i,0]]))
+                trans_mask_temp = pad(trans_mask_list[i],[0,node_max-shape_list[i,1]],
+                                      value=-float('inf'))
+                trans_mask.append(pad(trans_mask_temp,[0,0,0,seqdblock_max-shape_list[i,0]]))
+            seqs = torch.stack(seqs)
+            decoder_input = {'trans_mask': torch.stack(trans_mask).unsqueeze(-1), 
+                             'self_mask': (-float('inf')*torch.ones(seqdblock_max,seqdblock_max)) \
+                             .triu(diagonal=1).unsqueeze(-1)}
+            return decoder_input, {'seq':seqs,'pos':torch.arange(seqdblock_max)}
             
     def label_collate(self, labels):
         if self.cfg.task == 'optimum_path':
@@ -54,6 +75,28 @@ class GenovaCollator(object):
             for i, label in enumerate(labels):
                 result_pading_mask[i, label.shape[0]:] = 0
                 label = pad(label,[0,node_max-label.shape[1],0,seqdblock_max-label.shape[0]])
+                result.append(label)
+            return torch.stack(result), result_pading_mask
+        
+        elif self.cfg.task == 'sequence_generation':
+            shape_list = np.array([label.shape for label in labels])
+            seqdblock_max = shape_list[:,0].max()
+            result = []
+            result_pading_mask = torch.ones(len(labels),seqdblock_max,dtype=bool)
+            for i, label in enumerate(labels):
+                result_pading_mask[i, label.shape[0]:] = 0
+                label = pad(label,[0,seqdblock_max-label.shape[0]])
+                result.append(label)
+            return torch.stack(result), result_pading_mask
+        
+        elif self.cfg.task == 'node_classification':
+            shape_list = np.array([label.shape for label in labels])
+            node_max = shape_list.max()
+            result = []
+            result_pading_mask = torch.ones(len(labels),node_max,dtype=bool)
+            for i, label in enumerate(labels):
+                result_pading_mask[i, label.shape[0]:] = 0
+                label = pad(label,[0,node_max-label.shape[0]])
                 result.append(label)
             return torch.stack(result), result_pading_mask
     
