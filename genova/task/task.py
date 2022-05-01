@@ -28,6 +28,9 @@ class Task:
         if self.cfg.task == 'optimum_path':
             self.train_loss_fn = nn.KLDivLoss(reduction='batchmean')
             self.eval_loss_fn = nn.KLDivLoss(reduction='sum')
+        elif self.cfg.task == 'node_classification':
+            self.train_loss_fn = genova.loss.BinaryFocalLoss()
+            self.eval_loss_fn = genova.loss.BinaryFocalLoss(reduction='sum')
         else:
             self.train_loss_fn = nn.CrossEntropyLoss()
             self.eval_loss_fn = nn.CrossEntropyLoss(reduction='sum')
@@ -109,13 +112,36 @@ class Task:
         loss_cum = torch.Tensor([0]).to(self.device)
         total_seq_len = torch.Tensor([0]).to(self.device)
         if self.cfg.task =='node_classification':
+            total_match = torch.Tensor([0]).to(self.device)
+            true_positive = torch.Tensor([0]).to(self.device)
+            total_positive = torch.Tensor([0]).to(self.device)
+            total_true = torch.Tensor([0]).to(self.device)
             for encoder_input, label, label_mask in self.eval_dl:
                 with torch.no_grad():
                     with autocast():
                         output = self.model(encoder_input=encoder_input)
-                        loss = self.eval_loss_fn(output[label_mask],label[label_mask])
+                        output = output[label_mask]
+                        label = label[label_mask]
+                        loss = self.eval_loss_fn(output,label)
+                    output = (output>0.5).float()
                     loss_cum += loss
                     total_seq_len += label_mask.sum()
+                    total_match += (output == label).sum()
+                    true_positive += ((output == label)[label == 1]).sum()
+                    total_positive += (label == 1).sum()
+                    total_true += (output == 1).sum()
+            if self.distributed:
+                dist.barrier()
+                dist.all_reduce(loss_cum)
+                dist.all_reduce(total_seq_len)
+                dist.all_reduce(total_match)
+                dist.all_reduce(true_positive)
+                dist.all_reduce(total_positive)
+                dist.all_reduce(total_true)
+            return (loss_cum/total_seq_len).item(), \
+                   (total_match/total_seq_len).item(), \
+                   (true_positive/total_positive).item(), \
+                   (true_positive/total_true).item()
         else:
             for encoder_input, decoder_input, tgt, label, label_mask in self.eval_dl:
                 with torch.no_grad():
@@ -125,8 +151,8 @@ class Task:
                         loss = self.eval_loss_fn(output[label_mask],label[label_mask])
                     loss_cum += loss
                     total_seq_len += label_mask.sum()
-        if self.distributed:
-            dist.barrier()
-            dist.all_reduce(loss_cum)
-            dist.all_reduce(total_seq_len)
-        return (loss_cum/total_seq_len).item()
+            if self.distributed:
+                dist.barrier()
+                dist.all_reduce(loss_cum)
+                dist.all_reduce(total_seq_len)
+            return (loss_cum/total_seq_len).item()

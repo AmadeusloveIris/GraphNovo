@@ -22,18 +22,31 @@ def main(cfg: DictConfig)->None:
     task.initialize(train_spec_header=train_spec_header,train_dataset_dir='/data/genova_data_filted',val_spec_header=eval_spec_header,val_dataset_dir='/data/genova_data')
     if dist.is_initialized() and dist.get_rank()==0: run = init_wandb(cfg)
     best_loss = float('inf')
-    for loss_train, total_step, epoch in task.train():
-        if dist.get_rank()==0: run.log({'train_loss':loss_train}, step=total_step)
-        if total_step%cfg.train.eval_period==0:
-            loss_eval = task.eval()
-            if dist.get_rank()==0:
-                print('epoch:{}, step:{}, train loss:{}, eval loss:{}'.format(epoch,total_step,loss_train,loss_eval))
-                run.log({'eval_loss': loss_eval}, step=total_step)
-                if best_loss>loss_eval:
-                    best_loss = loss_eval
-                    task.model_save()
-            dist.barrier()
-    run.finish()
+    if cfg.task =='node_classification':
+        for loss_train, total_step, epoch in task.train():
+            if total_step%cfg.train.eval_period==0:
+                loss_eval, accuracy, recall, precision = task.eval()
+                if dist.get_rank()==0:
+                    print('epoch:{}, step:{}, train loss:{}, eval loss:{}, accuracy: {}, recall: {}, precision: {}'.format(epoch,total_step,loss_train,loss_eval,accuracy,recall,precision))
+                    run.log({'eval_loss': loss_eval, 'accuracy': accuracy, 'recall': recall, 'precision': precision}, step=total_step)
+                    if best_loss>loss_eval:
+                        best_loss = loss_eval
+                        task.model_save()
+                dist.barrier()
+            elif dist.get_rank()==0: run.log({'train_loss':loss_train}, step=total_step)
+        run.finish()
+    else:
+        for loss_train, total_step, epoch in task.train():
+            if total_step%cfg.train.eval_period==0:
+                loss_eval = task.eval()
+                if dist.get_rank()==0:
+                    print('epoch:{}, step:{}, train loss:{}, eval loss:{}'.format(epoch,total_step,loss_train,loss_eval))
+                    run.log({'eval_loss': loss_eval}, step=total_step)
+                    if best_loss>loss_eval:
+                        best_loss = loss_eval
+                        task.model_save()
+            elif dist.get_rank()==0: run.log({'train_loss':loss_train}, step=total_step)
+        run.finish()
 
 if __name__=='__main__':
     main()

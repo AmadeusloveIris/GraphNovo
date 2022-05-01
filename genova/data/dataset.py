@@ -31,7 +31,7 @@ class GenovaDataset(Dataset):
         node_mass = spec.pop('node_mass')
         seq = spec_head['Annotated Sequence'].replace('L','I')
         if self.cfg.task == 'node_classification':
-            graph_label = torch.any(graph_label, 0).long()
+            graph_label = torch.any(graph_label, 0).float()
             return spec, graph_label
         
         elif self.cfg.task == 'optimum_path_sequence':
