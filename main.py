@@ -33,7 +33,9 @@ def main(cfg: DictConfig)->None:
                         best_loss = loss_eval
                         task.model_save()
                 dist.barrier()
-            elif dist.get_rank()==0: run.log({'train_loss':loss_train}, step=total_step)
+            elif dist.get_rank()==0:
+                print('step: {}, train_loss: {}'.format(total_step,loss_train)) 
+                run.log({'train_loss':loss_train}, step=total_step)
         run.finish()
     else:
         for loss_train, total_step, epoch in task.train():
@@ -45,7 +47,9 @@ def main(cfg: DictConfig)->None:
                     if best_loss>loss_eval:
                         best_loss = loss_eval
                         task.model_save()
-            elif dist.get_rank()==0: run.log({'train_loss':loss_train}, step=total_step)
+            elif dist.get_rank()==0: 
+                print('step: {}, train_loss: {}'.format(total_step,loss_train))
+                run.log({'train_loss':loss_train}, step=total_step)
         run.finish()
 
 if __name__=='__main__':

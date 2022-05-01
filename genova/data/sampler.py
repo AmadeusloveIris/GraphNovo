@@ -109,7 +109,7 @@ class GenovaBatchSampler(Sampler):
             encoder_path_consumer = self.encoder_mem.path_matrix * max_node**2 * batch_num + self.encoder_mem.path_sparse * path_num
             encoder_relation_cosumer = self.encoder_mem.relation_matrix * max_node**2 * batch_num + self.encoder_mem.relation_ffn * max_node * batch_num
             encoder_theo = encoder_node_consumer + encoder_edge_consumer + encoder_path_consumer + encoder_relation_cosumer
-            if 'decoder' in self.cfg:
+            if self.cfg.task != 'node_classification':
                 decoder_self_relation = self.decoder_mem.self_relation_matrix * 32**2 * batch_num
                 decoder_trans_relation = self.decoder_mem.self_relation_matrix * 32*max_node * batch_num
                 decoder_ffn = (self.decoder_mem.self_relation_linear+self.decoder_mem.trans_relation_linear+self.decoder_mem.relation_ffn) * 32 * batch_num

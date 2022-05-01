@@ -85,7 +85,7 @@ class Task:
                     if total_step%self.cfg.train.detect_period == 1: loss_cum = 0
                     self.optimizer.zero_grad()
                     with autocast():
-                        output = self.model(encoder_input=encoder_input)
+                        output = self.model(encoder_input=encoder_input).squeeze(-1)
                         loss = self.train_loss_fn(output[label_mask],label[label_mask])
                     loss_cum += loss.item()
                     self.scaler.scale(loss).backward()
@@ -120,7 +120,7 @@ class Task:
                 with torch.no_grad():
                     with autocast():
                         output = self.model(encoder_input=encoder_input)
-                        output = output[label_mask]
+                        output = output[label_mask].squeeze(-1)
                         label = label[label_mask]
                         loss = self.eval_loss_fn(output,label)
                     output = (output>0.5).float()
