@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class BinaryFocalLoss(nn.modules):
+class BinaryFocalLoss(nn.Module):
     def __init__(self,
     alpha: float = -1,
     gamma: float = 1,
