@@ -3,6 +3,7 @@ import gzip
 import torch
 import pickle
 import numpy as np
+from math import floor
 from torch.utils.data import Dataset
 from genova.utils.BasicClass import Residual_seq
 
@@ -26,6 +27,7 @@ class GenovaDataset(Dataset):
             spec = pickle.loads(gzip.decompress(f.read(spec_head['MSGP Datablock Length'])))
 
         spec['node_input']['charge'] = spec_head['Charge']
+        spec['node_input']['rt'] = floor(spec_head['Normalized RT [min]']*self.cfg.preprocessing.max_rt_bin)
         graph_label = spec.pop('graph_label').T
         graph_label = graph_label[graph_label.any(-1)]
         node_mass = spec.pop('node_mass')

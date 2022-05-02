@@ -121,13 +121,14 @@ class GenovaCollator(object):
         node_feat = []
         node_sourceion = []
         charge = torch.IntTensor([node_input['charge'] for node_input in node_inputs])
+        rt = torch.IntTensor([node_input['rt'] for node_input in node_inputs])
         for node_input in node_inputs:
             node_num, node_subgraph_node = node_input['node_sourceion'].shape
             node_feat.append(pad(node_input['node_feat'], 
                                  [0, 0, 0, max_subgraph_node - node_subgraph_node, 0, max_node - node_num]))
             node_sourceion.append(pad(node_input['node_sourceion'], 
                                       [0, max_subgraph_node - node_subgraph_node, 0, max_node - node_num]))
-        return {'node_feat':torch.stack(node_feat),'node_sourceion':torch.stack(node_sourceion),'charge':charge}
+        return {'node_feat':torch.stack(node_feat),'node_sourceion':torch.stack(node_sourceion),'charge':charge,'rt':rt}
     
     def path_collate(self, path_inputs, max_node, node_shape):
         rel_type = torch.concat([path_input['rel_type'] for path_input in path_inputs]).squeeze(-1)

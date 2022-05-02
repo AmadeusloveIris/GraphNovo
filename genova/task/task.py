@@ -1,11 +1,8 @@
 import os
-import math
 import torch
 import genova
-from omegaconf import OmegaConf
 from torch import nn, optim
 import torch.distributed as dist
-from multiprocessing import cpu_count
 from torch.utils.data import DataLoader
 from torch.cuda.amp import autocast, GradScaler
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -29,8 +26,8 @@ class Task:
             self.train_loss_fn = nn.KLDivLoss(reduction='batchmean')
             self.eval_loss_fn = nn.KLDivLoss(reduction='sum')
         elif self.cfg.task == 'node_classification':
-            self.train_loss_fn = genova.loss.BinaryFocalLoss()
-            self.eval_loss_fn = genova.loss.BinaryFocalLoss(reduction='sum')
+            self.train_loss_fn = nn.BCEWithLogitsLoss()
+            self.eval_loss_fn = nn.BCEWithLogitsLoss(reduction='sum')
         else:
             self.train_loss_fn = nn.CrossEntropyLoss()
             self.eval_loss_fn = nn.CrossEntropyLoss(reduction='sum')
@@ -38,6 +35,7 @@ class Task:
         assert self.distributed==dist.is_initialized()
         if self.distributed: self.model = DDP(self.model, device_ids=[self.local_rank], output_device=self.local_rank)
         self.optimizer = optim.AdamW(self.model.parameters(), lr=self.cfg.train.lr)
+        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', self.cfg.train.scheduler_factor, self.cfg.train.scheduler_patience)
         self.scaler = GradScaler()
         self.persistent_file_name = os.path.join(self.serialized_model_path,self.cfg.wandb.project+'_'+self.cfg.wandb.name+'.pt')
         if os.path.exists(self.persistent_file_name):
