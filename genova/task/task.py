@@ -52,7 +52,7 @@ class Task:
         sampler = genova.data.GenovaBatchSampler(self.cfg,self.device,0.95,train_spec_header,[0,128,256,512],self.model)
         collate_fn = genova.data.GenovaCollator(self.cfg)
         if self.distributed:
-            train_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True,num_workers=2)
+            train_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True,num_workers=10)
         else:
             train_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True)
         train_dl = genova.data.DataPrefetcher(train_dl,self.device)
