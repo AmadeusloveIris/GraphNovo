@@ -16,7 +16,7 @@ def main(cfg: DictConfig)->None:
     eval_spec_header = eval_spec_header[eval_spec_header['Experiment Name']=='Plasma']
     eval_spec_header = eval_spec_header[eval_spec_header['Annotated Sequence'].str.len()<=32]
     task = genova.task.Task(cfg,serialized_model_path=cfg.train.serialized_model_path)
-    task.initialize(train_spec_header=train_spec_header,train_dataset_dir='/data/genova_data_filted',val_spec_header=eval_spec_header,val_dataset_dir='/data/genova_data')
+    task.initialize(train_spec_header=train_spec_header,train_dataset_dir='/data/genova_data',val_spec_header=eval_spec_header,val_dataset_dir='/data/genova_data')
     if dist.is_initialized() and dist.get_rank()!=0: pass
     else:
         run = wandb.init(entity=cfg.wandb.entity, 

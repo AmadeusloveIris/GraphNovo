@@ -31,7 +31,7 @@ class NodeEncoder(nn.Module):
 
         self.ion_source_embed = nn.Embedding(max_subion_num, d_ion_embed,padding_idx=0)
         self.charge_embed = nn.Embedding(max_charge, d_node_extanded)
-        self.rt_embed = nn.Embedding(max_rt_bin, d_node_extanded)
+        self.rt_embed = nn.Embedding(max_rt_bin+1, d_node_extanded)
         self.shared_mlp = nn.Sequential(
             nn.Linear(d_node, d_node*2),
             nn.ReLU(inplace=True),
