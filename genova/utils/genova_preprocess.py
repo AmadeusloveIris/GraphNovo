@@ -211,7 +211,7 @@ class GraphGenerator:
         return graphnode_mass
     
     def graphnode_feature_generator(self, graphnode_mass, subnode_mass, subnode_feature, precursor_ion_mass):
-        mass_threshold = 2*(self.mass_error_da+self.mass_error_ppm*precursor_ion_mass*1e-6)
+        mass_threshold = 2*self.mass_error_da+self.mass_error_ppm*precursor_ion_mass*1e-6
         lower_bounds = subnode_mass.searchsorted(graphnode_mass - mass_threshold)
         higher_bounds = subnode_mass.searchsorted(graphnode_mass + mass_threshold)
         subnode_maxnum = (higher_bounds-lower_bounds).max()
@@ -234,7 +234,7 @@ class GraphGenerator:
     
     def edge_generator(self, graphnode_moverz, precursor_ion_mass):
         n = graphnode_moverz.size
-        mass_threshold = 2*(self.mass_error_da+self.mass_error_ppm*precursor_ion_mass*1e-6)
+        mass_threshold = 2*self.mass_error_da+self.mass_error_ppm*precursor_ion_mass*1e-6
         mass_difference = np.zeros((n,n),dtype=np.float64)
         for x in range(graphnode_moverz.size-1):
             mass_difference[x,x+1:] = graphnode_moverz[x+1:] - graphnode_moverz[x]

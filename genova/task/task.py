@@ -23,8 +23,10 @@ class Task:
         self.model = genova.models.Genova(self.cfg).to(self.device)
         
         if self.cfg.task == 'optimum_path':
-            self.train_loss_fn = nn.KLDivLoss(reduction='batchmean')
-            self.eval_loss_fn = nn.KLDivLoss(reduction='sum')
+            self.train_loss_fn = genova.loss.FocalOPCE()
+            self.eval_loss_fn = genova.loss.FocalOPCE()
+            #self.train_loss_fn = nn.KLDivLoss(reduction='batchmean')
+            #self.eval_loss_fn = nn.KLDivLoss(reduction='sum')
         elif self.cfg.task == 'node_classification':
             self.train_loss_fn = nn.BCEWithLogitsLoss()
             self.eval_loss_fn = nn.BCEWithLogitsLoss(reduction='sum')
@@ -63,7 +65,7 @@ class Task:
         sampler = genova.data.GenovaBatchSampler(self.cfg,self.device,2,val_spec_header,[0,128,256,512],self.model)
         collate_fn = genova.data.GenovaCollator(self.cfg)
         if self.distributed:
-            eval_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True,num_workers=2)
+            eval_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True,num_workers=5)
         else:
             eval_dl = DataLoader(ds,batch_sampler=sampler,collate_fn=collate_fn,pin_memory=True)
         eval_dl = genova.data.DataPrefetcher(eval_dl,self.device)
@@ -98,7 +100,7 @@ class Task:
                     self.optimizer.zero_grad()
                     with autocast():
                         output = self.model(encoder_input=encoder_input, decoder_input=decoder_input, tgt=tgt)
-                        if self.cfg.task == 'optimum_path': output = output.log_softmax(-1)
+                        #if self.cfg.task == 'optimum_path': output = output.log_softmax(-1)
                         loss = self.train_loss_fn(output[label_mask],label[label_mask])
                     loss_cum += loss.item()
                     self.scaler.scale(loss).backward()
@@ -145,7 +147,7 @@ class Task:
                 with torch.no_grad():
                     with autocast():
                         output = self.model(encoder_input=encoder_input, decoder_input=decoder_input, tgt=tgt)
-                        if self.cfg.task == 'optimum_path': output = output.log_softmax(-1)
+                        #if self.cfg.task == 'optimum_path': output = output.log_softmax(-1)
                         loss = self.eval_loss_fn(output[label_mask],label[label_mask])
                     loss_cum += loss
                     total_seq_len += label_mask.sum()

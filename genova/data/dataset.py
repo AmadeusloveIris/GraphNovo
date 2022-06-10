@@ -26,7 +26,7 @@ class GenovaDataset(Dataset):
             spec = pickle.loads(gzip.decompress(f.read(spec_head['MSGP Datablock Length'])))
 
         spec['node_input']['charge'] = spec_head['Charge']
-        spec['node_input']['rt'] = int(spec_head['Normalized RT [min]']*self.cfg.preprocessing.max_rt_bin)
+        spec['node_input']['rt'] = spec_head['iRT']
         graph_label = spec.pop('graph_label').T
         graph_label = graph_label[graph_label.any(-1)]
         node_mass = spec.pop('node_mass')

@@ -6,7 +6,7 @@ class NodeEncoder(nn.Module):
     def __init__(self,
                  d_ori_node: int,
                  max_charge: int,
-                 max_rt_bin: int,
+                 irt_vector_dimention: int,
                  max_subion_num: int,
                  d_node: int,
                  expansion_factor: int, 
@@ -31,7 +31,18 @@ class NodeEncoder(nn.Module):
 
         self.ion_source_embed = nn.Embedding(max_subion_num, d_ion_embed,padding_idx=0)
         self.charge_embed = nn.Embedding(max_charge, d_node_extanded)
-        self.rt_embed = nn.Embedding(max_rt_bin+1, d_node_extanded)
+        self.irt_mlp = nn.Sequential(nn.Linear(irt_vector_dimention,d_node*2),
+                                     nn.ReLU(inplace=True),
+                                     nn.LayerNorm(d_node*2),
+                                     nn.Linear(d_node*2,d_node*4),
+                                     nn.ReLU(inplace=True),
+                                     nn.LayerNorm(d_node*4),
+                                     nn.Linear(d_node*4,d_node*8),
+                                     nn.ReLU(inplace=True),
+                                     nn.LayerNorm(d_node*8),
+                                     nn.Linear(d_node*8, d_node_extanded)
+                                     )
+
         self.shared_mlp = nn.Sequential(
             nn.Linear(d_node, d_node*2),
             nn.ReLU(inplace=True),
@@ -70,7 +81,7 @@ class NodeEncoder(nn.Module):
         """
         node_feat_source = self.ion_source_embed(node_sourceion)
         charge_embedding = self.charge_embed(charge).unsqueeze(1)
-        rt_embedding = self.rt_embed(rt).unsqueeze(1)
+        rt_embedding = self.irt_mlp(rt).unsqueeze(1)
         node_feat = torch.concat([node_feat, node_feat_source], dim=-1)
         node = self.shared_mlp(node_feat)
         node, _ = torch.max(node, -2)

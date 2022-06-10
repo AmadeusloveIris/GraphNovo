@@ -21,9 +21,11 @@ class DataPrefetcher:
         #self.preload()
 
     def preload(self):
-        self.batch = next(self.loader)
-        self.batch = self.to_cuda(self.batch)
-    
+        try:
+            self.batch = next(self.loader)
+            self.batch = self.to_cuda(self.batch)
+        except StopIteration: self.batch = None
+        
     def __iter__(self):
         self.loader = iter(self.loader_ori)
         self.preload()
@@ -32,6 +34,7 @@ class DataPrefetcher:
     def __next__(self):
         # You need to wait until last batch of data
         # move to device
+        if self.batch is None: raise StopIteration
         torch.cuda.current_stream().wait_stream(self.stream)
         batch = self.batch
         self.preload()
