@@ -1,4 +1,5 @@
 import re
+import json
 import numpy as np
 
 class Composition():
@@ -57,6 +58,12 @@ class Composition():
         for k in self.composition:
             result.update({k: other * self.composition[k]})
         return Composition(result)
+
+    def __eq__(self, other):
+        return self.composition==other.composition
+
+    def __hash__(self):
+        return hash(json.dumps(self.composition,sort_keys=True))
 
     def __repr__(self):
         return str(self.composition)
