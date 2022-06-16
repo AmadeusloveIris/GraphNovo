@@ -166,6 +166,8 @@ class Residual_seq():
         return [cls.__aa_residual_composition[aa].mass_calculater() for aa in seq]
 
 class Ion():
+    # Ion offset design from http://www.matrixscience.com/help/fragmentation_help.html 
+    # Part: Formulae to Calculate Fragment Ion m/z values
     __ion_offset = {
         'a': Composition('-CHO'),
         'a-NH3': Composition('-CHO') + Composition('-NH3'),
