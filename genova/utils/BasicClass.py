@@ -188,7 +188,7 @@ class Ion():
         'b': Composition('-H') + Composition('H'),
         'b-NH3': Composition('-H') + Composition('-NH3') + Composition('H'),
         'b-H2O': Composition('-H') + Composition('-H2O') + Composition('H'),
-        #'c': Composition('NH2') + Composition('OH'),
+        #'c': Composition('NH2') + Composition('H'),
         #'x': Composition('CO') + Composition('-H') + Composition('OH'),
         'y': Composition('H') + Composition('OH'),
         'y-NH3': Composition('H') + Composition('-NH3') + Composition('OH'),
