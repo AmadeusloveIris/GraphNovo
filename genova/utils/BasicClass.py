@@ -1,11 +1,13 @@
 import re
 import json
+import numbers
 import numpy as np
 
 class Composition():
     __atom_mass = {
         # From NIST, "https://physics.nist.gov/cgi-bin/Compositions/stand_alone.pl?ele=&all=all&isotype=some"
         'neutron': 1.00866491595,
+        'proton': 1.007276466621,
         'H': 1.00782503223,
         'C': 12,
         'N': 14.00307400443,
@@ -16,13 +18,16 @@ class Composition():
 
     def __init__(self, class_input):
         if type(class_input) == str:
-            formular_string = class_input
-            if formular_string[0] == '-':
-                self.composition = {i[0]: -int(i[1]) if i[1] else -int(1) for i in
-                                    re.findall("([A-Z][a-z]?)(\d*)", formular_string)}
+            if class_input.isupper():
+                formular_string = class_input
+                if formular_string[0] == '-':
+                    self.composition = {i[0]: -int(i[1]) if i[1] else -int(1) for i in
+                                        re.findall("([A-Z][a-z]?)(\d*)", formular_string)}
+                else:
+                    self.composition = {i[0]: int(i[1]) if i[1] else int(1) for i in
+                                        re.findall("([A-Z][a-z]?)(\d*)", formular_string)}
             else:
-                self.composition = {i[0]: int(i[1]) if i[1] else int(1) for i in
-                                    re.findall("([A-Z][a-z]?)(\d*)", formular_string)}
+                self.composition = {class_input:1}
         elif type(class_input) == dict:
             self.composition = class_input
         else:
@@ -31,45 +36,57 @@ class Composition():
 
     def __add__(self, other):
         result = {}
-        for k in self.composition:
-            result.update({k: self.composition[k]})
-        for k in other.composition:
-            try:
-                result[k] += other.composition[k]
-                if result[k] == 0: result.pop(k)
-            except KeyError:
-                result.update({k: other.composition[k]})
-        return Composition(result)
+        if isinstance(other, Composition):
+            for k in self.composition:
+                result.update({k: self.composition[k]})
+            for k in other.composition:
+                try:
+                    result[k] += other.composition[k]
+                    if result[k] == 0: result.pop(k)
+                except KeyError:
+                    result.update({k: other.composition[k]})
+            return Composition(result)
+        else:
+            return NotImplemented
 
     def __sub__(self, other):
         result = {}
-        for k in self.composition:
-            result.update({k: self.composition[k]})
-        for k in other.composition:
-            try:
-                result[k] -= other.composition[k]
-                if result[k] == 0: result.pop(k)
-            except KeyError:
-                result.update({k: -other.composition[k]})
-        return Composition(result)
+        if isinstance(other, Composition):
+            for k in self.composition:
+                result.update({k: self.composition[k]})
+            for k in other.composition:
+                try:
+                    result[k] -= other.composition[k]
+                    if result[k] == 0: result.pop(k)
+                except KeyError:
+                    result.update({k: -other.composition[k]})
+            return Composition(result)
+        else:
+            return NotImplemented
 
     def __mul__(self, other):
-        result = {}
-        for k in self.composition:
-            result.update({k: other * self.composition[k]})
-        return Composition(result)
+        if isinstance(other, numbers.Integral):
+            result = {}
+            for k in self.composition:
+                result.update({k: other * self.composition[k]})
+            return Composition(result)
+        else:
+            return NotImplemented
 
     def __eq__(self, other):
-        return self.composition==other.composition
+        if isinstance(other, Composition):
+            return self.composition==other.composition
+        else:
+            return NotImplemented
 
     def __hash__(self):
         return hash(json.dumps(self.composition,sort_keys=True))
 
     def __repr__(self):
-        return str(self.composition)
+        return 'Composition('+str(self.composition)+')'
 
     def __str__(self):
-        return str(self.composition)
+        return 'Composition('+str(self.composition)+')'
 
     def mass_calculater(self):
         result = 0
@@ -213,12 +230,12 @@ class Ion():
         if charge==None:
             charge = int(ion[0])
             ion = ion[1:]
-        return (peak_mz-Composition('H').mass_calculater())*charge-cls.__term_ion_offset[ion].mass_calculater()
+        return (peak_mz-Composition('proton').mass_calculater())*charge-cls.__term_ion_offset[ion].mass_calculater()
 
     @classmethod
     def peptide2ionmz(cls, seq, ion, charge):
-        ion_compsition = Residual_seq(seq).composition+cls.__term_ion_offset[ion]+Composition('H')*charge
-        ion_mass = ion_compsition.mass_calculater()/charge
+        ion_compsition = Residual_seq(seq).composition+cls.__term_ion_offset[ion]+Composition('proton')*charge
+        ion_mass = ion_compsition.mass/charge
         return ion_mass
     
     @classmethod
@@ -226,12 +243,12 @@ class Ion():
         if charge==None:
             charge = int(ion[0])
             ion = ion[1:]
-        return (seqmz+cls.__term_ion_offset[ion].mass_calculater())/charge+Composition('H').mass_calculater()
+        return (seqmz+cls.__term_ion_offset[ion].mass_calculater())/charge+Composition('proton').mass
 
     @classmethod
     def precursorion2mass(cls, precursor_ion_moverz, precursor_ion_charge):
         #Composition('H2O') 是n端和c端原子的总和，但是如果做TMT或者其他对N，C端修饰的需要进行修改
-        return precursor_ion_moverz*precursor_ion_charge-Composition('H2O').mass_calculater()-precursor_ion_charge*Composition('H').mass_calculater()
+        return precursor_ion_moverz*precursor_ion_charge-Composition('H2O').mass-precursor_ion_charge*Composition('proton').mass
 
     @classmethod
     def add_ion(cls,ion_comps):
