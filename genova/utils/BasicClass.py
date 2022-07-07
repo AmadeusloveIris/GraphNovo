@@ -8,6 +8,7 @@ class Composition():
         # From NIST, "https://physics.nist.gov/cgi-bin/Compositions/stand_alone.pl?ele=&all=all&isotype=some"
         'neutron': 1.00866491595,
         'proton': 1.007276466621,
+        'electron': 0.000548579909065,
         'H': 1.00782503223,
         'C': 12,
         'N': 14.00307400443,
@@ -133,16 +134,16 @@ class Residual_seq():
     }
 
     def __init__(self, seqs):
-        seq = [i for i in seqs if i in self.__aa_residual_composition]
+        seq = [i for i in seqs if not i.isspace()]
         self.step_mass = []
         tmp = self.__aa_residual_composition[seq[0]]
         for i in seq[1:]:
-            self.step_mass.append(tmp.mass_calculater())
+            self.step_mass.append(tmp.mass)
             tmp += self.__aa_residual_composition[i]
 
         self.seq = seq
         self.composition = tmp
-        self.mass = tmp.mass_calculater()
+        self.mass = tmp.mass
         self.step_mass.append(self.mass)
         self.step_mass = np.array(self.step_mass)
 
@@ -180,7 +181,7 @@ class Residual_seq():
     
     @classmethod
     def seqs2massmap(cls,seq):
-        return [cls.__aa_residual_composition[aa].mass_calculater() for aa in seq]
+        return [cls.__aa_residual_composition[aa].mass for aa in seq]
 
 class Ion():
     # Ion offset design from http://www.matrixscience.com/help/fragmentation_help.html 
@@ -230,7 +231,7 @@ class Ion():
         if charge==None:
             charge = int(ion[0])
             ion = ion[1:]
-        return (peak_mz-Composition('proton').mass_calculater())*charge-cls.__term_ion_offset[ion].mass_calculater()
+        return (peak_mz-Composition('proton').mass)*charge-cls.__term_ion_offset[ion].mass
 
     @classmethod
     def peptide2ionmz(cls, seq, ion, charge):
@@ -243,7 +244,7 @@ class Ion():
         if charge==None:
             charge = int(ion[0])
             ion = ion[1:]
-        return (seqmz+cls.__term_ion_offset[ion].mass_calculater())/charge+Composition('proton').mass
+        return (seqmz+cls.__term_ion_offset[ion].mass)/charge+Composition('proton').mass
 
     @classmethod
     def precursorion2mass(cls, precursor_ion_moverz, precursor_ion_charge):
