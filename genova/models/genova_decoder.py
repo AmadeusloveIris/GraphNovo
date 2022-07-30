@@ -1,5 +1,5 @@
 import torch.nn as nn
-from genova.modules.genova_decoder_layer import GenovaDecoderLayer
+from genova.modules import GenovaDecoderLayer
 class GenovaDecoder(nn.Module):
     def __init__(self,cfg) -> None:
         super().__init__()

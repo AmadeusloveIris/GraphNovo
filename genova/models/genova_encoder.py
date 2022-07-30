@@ -1,8 +1,5 @@
 import torch.nn as nn
-
-from genova.modules.edge_encoder import EdgeEncoder
-from genova.modules.node_encoder import NodeEncoder
-from genova.modules.genova_encoder_layer import GenovaEncoderLayer
+from genova.modules import EdgeEncoder, NodeEncoder, GenovaEncoderLayer
 class GenovaEncoder(nn.Module):
     def __init__(self, cfg):
         """_summary_

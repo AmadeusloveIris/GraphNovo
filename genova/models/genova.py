@@ -1,7 +1,5 @@
 import torch.nn as nn
-
-from genova.models.genova_encoder import GenovaEncoder
-from genova.models.genova_decoder import GenovaDecoder
+from genova.models import GenovaEncoder, GenovaDecoder
 
 class Genova(nn.Module):
     def __init__(self,cfg,dict_len=23) -> None:
