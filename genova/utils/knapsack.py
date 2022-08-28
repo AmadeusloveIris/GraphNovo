@@ -50,11 +50,12 @@ def knapsack_composition_builder(max_mass: float):
     return knapsack_composition
 
 if __name__=='__main__':
-    knapsack_composition = knapsack_composition_builder(float(argv[1]))
-    #pickle.dump(knapsack_composition,open(argv[2],'wb'))
+    #knapsack_composition = knapsack_composition_builder(float(argv[1]))
+    knapsack_composition = combination_composition_builder(float(argv[1]))
+    pickle.dump(knapsack_composition,open(argv[2],'wb'))
     
     knapsack_mass = OrderedDict()
     temp = {composition.mass:composition for composition in knapsack_composition.keys()}
     for candidate_mass in sorted(temp.keys()):
         knapsack_mass[candidate_mass] = knapsack_composition[temp[candidate_mass]]
-    pickle.dump(knapsack_mass,open(argv[2],'wb'))
+    pickle.dump(knapsack_mass,open(argv[3],'wb'))
