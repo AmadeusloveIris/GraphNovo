@@ -70,6 +70,7 @@ class GenovaDataset(Dataset):
         edge_mask = torch.zeros(node_num,node_num,dtype=bool)
         for x,y in enumerate(node_mass.searchsorted(node_mass+min(self.aa_mass_dict.values())*7+0.04)):
             edge_mask[x,y:] = True
+        #有bug未修复，dist!=0不代表没有edge.
         edge_mask = torch.logical_or(edge_mask,dist!=0)
         trans_mask=((graph_label@edge_mask.int())!=0).bool()
         trans_mask = torch.where(trans_mask,0.0,-float('inf'))
