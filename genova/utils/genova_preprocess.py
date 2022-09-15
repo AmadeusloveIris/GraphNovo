@@ -121,7 +121,7 @@ class GraphGenerator:
         self.n_term_ion_list = ['1a','1a-NH3','1a-H2O','1b','1b-NH3','1b-H2O','2a','2a-NH3','2a-H2O','2b','2b-NH3','2b-H2O']
         self.c_term_ion_list = ['1y','1y-NH3','1y-H2O','2y','2y-NH3','2y-H2O']
         
-    def __call__(self,product_ions_moverz, product_ions_intensity, precursor_ion_mass, muti_charged):
+    def __call__(self, seq, product_ions_moverz, product_ions_intensity, precursor_ion_mass, muti_charged):
         peak_feature = self.peak_feature_generation(product_ions_moverz, product_ions_intensity)
         subnode_mass, subnode_feature = self.candidate_subgraph_generator(precursor_ion_mass, product_ions_moverz, peak_feature)
         node_mass = self.graphnode_mass_generator(precursor_ion_mass, product_ions_moverz, muti_charged)
@@ -306,7 +306,7 @@ if __name__=='__main__':
                 product_ion_info = pickle.loads(f.read(data_len))
                 precursor_ion_mass = Ion.precursorion2mass(precursor_moverz, precursor_charge)
                 product_ions_moverz, product_ions_intensity = product_ion_info['product_ions_moverz'], product_ion_info['product_ions_intensity']
-                node_mass, node_input, rel_input, edge_input, graph_label = graph_gen(product_ions_moverz, product_ions_intensity, precursor_ion_mass, precursor_charge>2)
+                node_mass, node_input, rel_input, edge_input, graph_label = graph_gen(seq, product_ions_moverz, product_ions_intensity, precursor_ion_mass, precursor_charge>2)
                 record = {'node_mass':node_mass,
                           'node_input':node_input, 
                           'rel_input':rel_input, 
