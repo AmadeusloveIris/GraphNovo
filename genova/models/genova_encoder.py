@@ -10,8 +10,7 @@ class GenovaEncoder(nn.Module):
         """
         super().__init__()
         self.node_encoder = NodeEncoder(d_ori_node = cfg.preprocessing.d_ori_node, 
-                                        max_charge = cfg.preprocessing.max_charge, 
-                                        irt_vector_dimention = cfg.preprocessing.irt_vector_dimention,
+                                        max_charge = cfg.preprocessing.max_charge,
                                         max_subion_num = cfg.preprocessing.max_subion_num, 
                                         d_node = cfg.encoder.node_encoder.d_node,
                                         expansion_factor = cfg.encoder.node_encoder.expansion_factor,

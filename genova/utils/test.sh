@@ -1,11 +1,14 @@
 #!/bin/sh
 
-for i in {1..$1}
+spec_perworker=`expr $2 / $1`
+echo $spec_perworker
+for i in $(seq 1 $1)
 do
     if [ $i = $1 ]
     then
-        nohup python genova_preprocess.py $i $[ 61314 * ($i - 1) ] 1962054 &
-    else    
-        nohup python genova_preprocess.py $i $[ 61314 * ($i - 1) ] $[ 61314 * $i ] &
+        echo "$i $(( $spec_perworker * (i - 1) )) $2"
+    else
+        echo "$i $(( $spec_perworker * (i - 1) )) $(( $spec_perworker * i ))"
     fi
 done
+

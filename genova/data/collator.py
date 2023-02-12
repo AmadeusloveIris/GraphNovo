@@ -7,14 +7,15 @@ class GenovaCollator(object):
         self.cfg = cfg
 
     def __call__(self, batch):
-        if self.cfg.task == 'optimum_path' or self.cfg.task == 'sequence_generation':
+        if self.cfg.task == 'optimal_path' or self.cfg.task == 'sequence_generation':
             spec = [record[0] for record in batch]
             tgt = [record[1] for record in batch]
             label = [record[2] for record in batch]
+            idx = [record[3] for record in batch]
             encoder_input = self.encoder_collate(spec)
             decoder_input, tgt = self.decoder_collate(tgt)
             label, label_mask = self.label_collate(label)
-            return encoder_input, decoder_input, tgt, label, label_mask
+            return encoder_input, decoder_input, tgt, label, label_mask, idx
         
         elif self.cfg.task == 'node_classification':
             spec = [record[0] for record in batch]
@@ -22,9 +23,11 @@ class GenovaCollator(object):
             encoder_input = self.encoder_collate(spec)
             label, label_mask = self.label_collate(label)
             return encoder_input, label, label_mask
+        
+        else: raise NotImplementedError
     
     def decoder_collate(self, decoder_input):
-        if self.cfg.task == 'optimum_path':
+        if self.cfg.task == 'optimal_path':
             tgts_list = [record['tgt'] for record in decoder_input]
             trans_mask_list = [record['trans_mask'] for record in decoder_input]
             shape_list = np.array([tgt.shape for tgt in trans_mask_list])
@@ -64,9 +67,11 @@ class GenovaCollator(object):
                              'self_mask': (-float('inf')*torch.ones(seqdblock_max,seqdblock_max)) \
                              .triu(diagonal=1).unsqueeze(-1)}
             return decoder_input, {'seq':seqs,'pos':torch.arange(seqdblock_max)}
+        
+        else: raise NotImplementedError
             
     def label_collate(self, labels):
-        if self.cfg.task == 'optimum_path':
+        if self.cfg.task == 'optimal_path':
             shape_list = np.array([label.shape for label in labels])
             seqdblock_max = shape_list[:,0].max()
             node_max = shape_list[:,1].max()
@@ -121,14 +126,13 @@ class GenovaCollator(object):
         node_feat = []
         node_sourceion = []
         charge = torch.IntTensor([node_input['charge'] for node_input in node_inputs])
-        rt = torch.IntTensor([node_input['rt'] for node_input in node_inputs])
         for node_input in node_inputs:
             node_num, node_subgraph_node = node_input['node_sourceion'].shape
             node_feat.append(pad(node_input['node_feat'], 
                                  [0, 0, 0, max_subgraph_node - node_subgraph_node, 0, max_node - node_num]))
             node_sourceion.append(pad(node_input['node_sourceion'], 
                                       [0, max_subgraph_node - node_subgraph_node, 0, max_node - node_num]))
-        return {'node_feat':torch.stack(node_feat),'node_sourceion':torch.stack(node_sourceion),'charge':charge,'rt':rt}
+        return {'node_feat':torch.stack(node_feat),'node_sourceion':torch.stack(node_sourceion),'charge':charge}
     
     def path_collate(self, path_inputs, max_node, node_shape):
         rel_type = torch.concat([path_input['rel_type'] for path_input in path_inputs]).squeeze(-1)

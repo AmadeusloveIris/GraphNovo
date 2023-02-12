@@ -3,9 +3,18 @@ defaults:
   - encoder: light
   - decoder: light
   - train: train
+  - infer: sequence_generation_inference
   - _self_
+
+mode: train
+dist: false
+train_spec_header_path: 
+eval_spec_header_path:
+train_dataset_dir:
+eval_dataset_dir:
 
 wandb:
   entity: genova
-  project: 
+  project: genova
+  name: hello_world
 

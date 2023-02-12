@@ -1,7 +1,6 @@
 max_charge: 100
 max_subion_num: 100
 max_seq_len: 50
-irt_vector_dimention: 12
 d_ori_node: 10
 d_ori_edge: 1
 edge_type_num: 50150

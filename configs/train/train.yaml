@@ -2,5 +2,4 @@ lr: 2e-4
 total_epoch: 10
 detect_period: 400
 eval_period: 4000
-scheduler_factor: 0.2
-scheduler_patience: 10
+serialized_model_path:

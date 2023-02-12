@@ -209,3 +209,23 @@ class GenovaBatchSampler(Sampler):
                 else: 
                     i += 1
         return sample_num/sample_count
+    
+class GenovaSequentialSampler(Sampler):
+    r"""Samples elements sequentially, always in the same order.
+    """
+
+    def __init__(self, spec_header):
+        self.spec_header = spec_header
+
+    def __iter__(self):
+        self.idx = 0
+        return self
+
+    def __next__(self):
+        if self.idx == len(self.spec_header): raise StopIteration
+        index = self.spec_header.iloc[self.idx:self.idx+1].index
+        self.idx += 1
+        return index
+
+    def __len__(self) -> int:
+        return len(self.spec_header)

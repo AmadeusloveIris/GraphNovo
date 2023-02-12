@@ -26,32 +26,30 @@ class GenovaDataset(Dataset):
             spec = pickle.loads(gzip.decompress(f.read(spec_head['MSGP Datablock Length'])))
 
         spec['node_input']['charge'] = spec_head['Charge']
-        spec['node_input']['rt'] = spec_head['iRT']
         graph_label = spec.pop('graph_label').T
         graph_label = graph_label[graph_label.any(-1)]
         node_mass = spec.pop('node_mass')
-        seq = spec_head['Annotated Sequence'].replace('L','I')
+        seq = spec_head['Annotated Sequence'].replace('L','I').replace(' ','')
         if self.cfg.task == 'node_classification':
             graph_label = torch.any(graph_label, 0).float()
             return spec, graph_label
-        
-        elif self.cfg.task == 'optimum_path_sequence':
-            raise NotImplementedError
             
         elif self.cfg.task == 'sequence_generation':
             tgt = {}
             seq_id = self.seq2id(seq)
             tgt['tgt'] = seq_id[:-1]
             tgt['trans_mask'] = self.trans_mask_sequence_generation(seq, node_mass)
-            return spec, tgt, seq_id[1:]
+            return spec, tgt, seq_id[1:], idx
         
-        elif self.cfg.task == 'optimum_path':
+        elif self.cfg.task == 'optimal_path':
             trans_mask = self.trans_mask_optimum_path(node_mass, graph_label, spec['rel_input']['dist'])
             graph_probability = torch.Tensor(self.graph_probability_gen(graph_label))
             tgt = {}
             tgt['tgt'] = graph_probability[:-1]
             tgt['trans_mask'] = trans_mask
-            return spec, tgt, graph_probability[1:]
+            return spec, tgt, graph_probability[1:], idx
+        
+        else: raise NotImplementedError
             
     def graph_probability_gen(self, graph_label):
         graph_probability = graph_label/graph_label.sum(-1).unsqueeze(1)
