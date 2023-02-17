@@ -8,6 +8,7 @@ defaults:
 
 mode: train
 dist: false
+task: sequence_generation
 train_spec_header_path: 
 eval_spec_header_path:
 train_dataset_dir:
@@ -15,6 +16,6 @@ eval_dataset_dir:
 
 wandb:
   entity: genova
-  project: genova
+  project: optimal_path
   name: hello_world
 

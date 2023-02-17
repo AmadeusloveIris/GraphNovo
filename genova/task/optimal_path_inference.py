@@ -163,7 +163,7 @@ def format_seq_predict(predict_path, node_mass, aa_datablock, aa_datablock_dict_
 
     return seq_predict
     
-def optimum_path_infer(cfg:DictConfig, spec_header, test_dl, model, device):
+def optimal_path_infer(cfg:DictConfig, spec_header, test_dl, model, device):
     genova_dir = get_original_cwd()
 
     # dictionary
@@ -172,7 +172,7 @@ def optimum_path_infer(cfg:DictConfig, spec_header, test_dl, model, device):
     aa_mass_dict = {aa:Residual_seq(aa).mass for aa in Residual_seq.output_aalist()}
     
     # save result
-    path_file_name = genova_dir + cfg.infer.optimum_path_file
+    path_file_name = genova_dir + cfg.infer.optimal_path_file
     path_csvfile = open(path_file_name, 'w', buffering=1)
     path_fieldnames = ['graph_idx', 'pred_path', 'pred_prob', 'label_path', 'pred_seq']
     writer_path = csv.DictWriter(path_csvfile, fieldnames=path_fieldnames, quoting=csv.QUOTE_NONNUMERIC)

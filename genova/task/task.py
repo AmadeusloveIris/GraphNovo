@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from torch.cuda.amp import autocast, GradScaler
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-from .optimum_path_inference import optimum_path_infer
+from .optimal_path_inference import optimal_path_infer
 from .seq_generation_inference import seq_generation_infer
 
 class Task:
@@ -194,6 +194,6 @@ class Task:
         
     def inference(self) -> float:
         if self.cfg.task == 'optimal_path':
-            optimum_path_infer(self.cfg, self.test_spec_header, self.test_dl, self.model, self.device)
+            optimal_path_infer(self.cfg, self.test_spec_header, self.test_dl, self.model, self.device)
         elif self.cfg.task == 'sequence_generation':
             seq_generation_infer(self.cfg, self.test_spec_header, self.test_dl, self.model, self.device)
