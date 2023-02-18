@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from torch.cuda.amp import autocast, GradScaler
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-from .optimum_path_inference import optimum_path_infer
+from .optimal_path_inference import optimal_path_infer
 from .seq_generation_inference import seq_generation_infer
 
 class Task:
@@ -61,13 +61,15 @@ class Task:
     def test_initialize(self, *, test_spec_header=None, test_dataset_dir=None):
         assert not self.distributed
         self.model = genova.models.Genova(self.cfg).to(self.device)
-        self.persistent_file_name = os.path.join(self.serialized_model_path,self.cfg.wandb.project+'.pt')
+        self.persistent_file_name = os.path.join(self.serialized_model_path,self.cfg.wandb.project+'_'+self.cfg.wandb.name+'.pt')
+        print('checkpoint: ', self.persistent_file_name)
         assert os.path.exists(self.persistent_file_name)
         if isinstance(self.cfg.infer.device, int):
             checkpoint = torch.load(self.persistent_file_name)
         else:
             checkpoint = torch.load(self.persistent_file_name,map_location='cpu')
-        self.model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.model.eval()
         self.test_dl = self.test_loader(test_spec_header,test_dataset_dir)
         self.test_spec_header = test_spec_header
 
@@ -194,6 +196,6 @@ class Task:
         
     def inference(self) -> float:
         if self.cfg.task == 'optimal_path':
-            optimum_path_infer(self.cfg, self.test_spec_header, self.test_dl, self.model, self.device)
+            optimal_path_infer(self.cfg, self.test_spec_header, self.test_dl, self.model, self.device)
         elif self.cfg.task == 'sequence_generation':
             seq_generation_infer(self.cfg, self.test_spec_header, self.test_dl, self.model, self.device)

@@ -3,18 +3,19 @@ defaults:
   - encoder: light
   - decoder: light
   - train: train
-  - infer: sequence_generation_inference
+  - infer: optimal_path_inference
   - _self_
 
 mode: train
 dist: false
+task: optimal_path
 train_spec_header_path: 
 eval_spec_header_path:
 train_dataset_dir:
 eval_dataset_dir:
 
 wandb:
-  entity: genova
-  project: genova
-  name: hello_world
+  entity: graphnovo
+  project: graphnovo
+  name: pathsearcher
 

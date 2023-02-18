@@ -1,6 +1,6 @@
 beam_size: 20
 testset: 'A_Thaliana'
-optimum_path_file: '/log/optimum_path/A_Thaliana_beam20_sum_test.csv'
-output_file: '/log/seq_generation/A_Thaliana_beam20_sum_beam20_sum_test.csv'
+optimal_path_file: '/log/optimal_path/A_Thaliana_beam20_sum.csv'
+output_file: '/log/sequence_generation/A_Thaliana_beam20_sum_beam20_sum.csv'
 data_dir: '/graphnovo_data/overall/'
 device: 0

@@ -163,7 +163,7 @@ def format_seq_predict(predict_path, node_mass, aa_datablock, aa_datablock_dict_
 
     return seq_predict
     
-def optimum_path_infer(cfg:DictConfig, spec_header, test_dl, model, device):
+def optimal_path_infer(cfg:DictConfig, spec_header, test_dl, model, device):
     genova_dir = get_original_cwd()
 
     # dictionary
@@ -172,7 +172,7 @@ def optimum_path_infer(cfg:DictConfig, spec_header, test_dl, model, device):
     aa_mass_dict = {aa:Residual_seq(aa).mass for aa in Residual_seq.output_aalist()}
     
     # save result
-    path_file_name = genova_dir + cfg.infer.optimum_path_file
+    path_file_name = genova_dir + cfg.infer.optimal_path_file
     path_csvfile = open(path_file_name, 'w', buffering=1)
     path_fieldnames = ['graph_idx', 'pred_path', 'pred_prob', 'label_path', 'pred_seq']
     writer_path = csv.DictWriter(path_csvfile, fieldnames=path_fieldnames, quoting=csv.QUOTE_NONNUMERIC)
@@ -187,105 +187,103 @@ def optimum_path_infer(cfg:DictConfig, spec_header, test_dl, model, device):
             print('Num of Samples: ', i)
         if torch.is_tensor(idx): idx = idx.tolist()
         spec_head = spec_header.loc[idx[0]]
+        
+        with open(os.path.join(genova_dir+cfg.infer.data_dir, spec_head['MSGP File Name']), 'rb') as f:
+            f.seek(spec_head['MSGP Datablock Pointer'])
+            spec = pickle.loads(gzip.decompress(f.read(spec_head['MSGP Datablock Length'])))
+            node_mass = spec['node_mass']
+            dist = spec['rel_input']['dist']
+            tensor_coor = torch.transpose(torch.unique(spec['edge_input']['edge_coor'][:,:2],dim=0), 0, 1)
+            tensor_values = torch.ones(tensor_coor.shape[1])
+            sparse_tensor = torch.sparse_coo_tensor(tensor_coor, tensor_values, dist.shape)
+            dist = sparse_tensor.to_dense()
+            assert dist.sum() == tensor_coor.shape[1]
+            precursor_moverz = spec_head['m/z']
+            precursor_charge = spec_head['Charge']
+            precursor_ion_mass = Ion.precursorion2mass(precursor_moverz, precursor_charge)
 
-        try:
-            with open(os.path.join(genova_dir+cfg.infer.data_dir, spec_head['MSGP File Name']), 'rb') as f:
-                f.seek(spec_head['MSGP Datablock Pointer'])
-                spec = pickle.loads(gzip.decompress(f.read(spec_head['MSGP Datablock Length'])))
-                node_mass = spec['node_mass']
-                dist = spec['rel_input']['dist']
-                tensor_coor = torch.transpose(torch.unique(spec['edge_input']['edge_coor'][:,:2],dim=0), 0, 1)
-                tensor_values = torch.ones(tensor_coor.shape[1])
-                sparse_tensor = torch.sparse_coo_tensor(tensor_coor, tensor_values, dist.shape)
-                dist = sparse_tensor.to_dense()
-                assert dist.sum() == tensor_coor.shape[1]
-                precursor_moverz = spec_head['m/z']
-                precursor_charge = spec_head['Charge']
-                precursor_ion_mass = Ion.precursorion2mass(precursor_moverz, precursor_charge)
+        with torch.no_grad():
+            time_step = 1
+            encoder_input = input_cuda(encoder_input, device)
+            graph_node = model.encoder(**encoder_input)
+            _, node_num, _, _ = encoder_input['node_input']['node_feat'].shape
 
-            with torch.no_grad():
-                time_step = 1
-                encoder_input = input_cuda(encoder_input, device)
-                graph_node = model.encoder(**encoder_input)
-                _, node_num, _, _ = encoder_input['node_input']['node_feat'].shape
+            # graph_probability_input & decoder_input for first time_step
+            graph_probability_input = torch.zeros(1, 1, node_num)  # [batch, seq_len, node_num]
+            graph_probability_input[:, :, 0] = 1
+            graph_probability_input = graph_probability_input.to(device)
+            decoder_input = generate_decoder_input(time_step, graph_probability_input, node_mass, dist, aa_mass_dict, device)
+            graph_probability = generate_graph_probability(graph_probability_input, decoder_input, graph_node, model)
 
-                # graph_probability_input & decoder_input for first time_step
-                graph_probability_input = torch.zeros(1, 1, node_num)  # [batch, seq_len, node_num]
-                graph_probability_input[:, :, 0] = 1
-                graph_probability_input = graph_probability_input.to(device)
-                decoder_input = generate_decoder_input(time_step, graph_probability_input, node_mass, dist, aa_mass_dict, device)
-                graph_probability = generate_graph_probability(graph_probability_input, decoder_input, graph_node, model)
+            # *_incomplete is for check the incomplete paths for every time step
+            # *_complete is for storing the complete paths' information
+            beam_size = min(cfg.infer.beam_size, spec_head['Node Number']-1)
+            graph_probability_input_list = [graph_probability_input[0]]
+            graph_probability_list = [graph_probability[0]]
+            graph_probability_input_complete = []
+            graph_probability_input_incomplete = []
+            score_list = [0]
+            score_complete = []
+            score_incomplete = []
 
-                # *_incomplete is for check the incomplete paths for every time step
-                # *_complete is for storing the complete paths' information
-                beam_size = min(cfg.infer.beam_size, spec_head['Node Number']-1)
-                graph_probability_input_list = [graph_probability_input[0]]
-                graph_probability_list = [graph_probability[0]]
-                graph_probability_input_complete = []
+            while True:
+                time_step += 1
+                graph_probability_input_list, score_list, \
+                score_complete, graph_probability_input_complete = \
+                    beam_best_k(graph_probability_input_list, graph_probability_list, score_list,
+                                score_complete, graph_probability_input_complete, beam_size, sum_flag, device)
+
+                # if beam size is large enough, it is possible to have the final node as the next node on second
+                # time step, then graph_probability_list[g_idx] will out of index.
+                # check if any path from the beam has reached the final node and the incomplete paths will continue
+                for g_idx, graph_probability_input in enumerate(graph_probability_input_list):
+                    if graph_probability_input[-1][-1].item() > 0:
+                        graph_probability_input_complete.append(graph_probability_input)
+                        if sum_flag == 'sum':
+                            score_complete.append(score_list[g_idx])
+                        elif sum_flag == 'average':
+                            score_complete.append(score_list[g_idx] / graph_probability_input.shape[0])
+                    else:
+                        graph_probability_input_incomplete.append(graph_probability_input)
+                        score_incomplete.append(score_list[g_idx])
+
+                # if the number of complete paths equal to beam size, it means the end to search
+                if beam_size == len(score_complete):
+                    score_complete = torch.concat([s.unsqueeze(0) for s in score_complete])
+                    path_index = torch.argmax(score_complete).item()
+                    graph_probability_input = graph_probability_input_complete[path_index].unsqueeze(0)
+                    pred_prob = extract_pred_prob(graph_node[:1,:,:], graph_probability_input, node_mass, \
+                                                dist, aa_mass_dict, device, model)
+                    graph_probability_input = graph_probability_input.cpu()
+                    break
+
+                graph_probability_input_list = graph_probability_input_incomplete
                 graph_probability_input_incomplete = []
-                score_list = [0]
-                score_complete = []
+                score_list = score_incomplete
                 score_incomplete = []
 
-                while True:
-                    time_step += 1
-                    graph_probability_input_list, score_list, \
-                    score_complete, graph_probability_input_complete = \
-                        beam_best_k(graph_probability_input_list, graph_probability_list, score_list,
-                                    score_complete, graph_probability_input_complete, beam_size, sum_flag, device)
+                # all paths not complete continue to generate the distribution to choose next node of the path
+                graph_probability_input_list = torch.stack(graph_probability_input_list, dim=0)
+                decoder_input = generate_decoder_input(time_step, graph_probability_input_list, node_mass, dist, aa_mass_dict, device)
+                graph_node = torch.stack(len(graph_probability_input_list) * [graph_node[0]], dim=0)
+                graph_probability_list = generate_graph_probability(graph_probability_input_list, decoder_input, graph_node, model)
 
-                    # if beam size is large enough, it is possible to have the final node as the next node on second
-                    # time step, then graph_probability_list[g_idx] will out of index.
-                    # check if any path from the beam has reached the final node and the incomplete paths will continue
-                    for g_idx, graph_probability_input in enumerate(graph_probability_input_list):
-                        if graph_probability_input[-1][-1].item() > 0:
-                            graph_probability_input_complete.append(graph_probability_input)
-                            if sum_flag == 'sum':
-                                score_complete.append(score_list[g_idx])
-                            elif sum_flag == 'average':
-                                score_complete.append(score_list[g_idx] / graph_probability_input.shape[0])
-                        else:
-                            graph_probability_input_incomplete.append(graph_probability_input)
-                            score_incomplete.append(score_list[g_idx])
+        # Do evaluation on optimal path for each sample
+        matched_num, predict_len, label_len, pred_path, label_path = path_evaluation(graph_probability_input, label_path_distribution)
+        path_pred_print = ' '.join([str(p) for p in pred_path])
+        seq_predict = format_seq_predict(pred_path, node_mass, aa_datablock,
+                                        aa_datablock_dict_reverse, precursor_ion_mass)
 
-                    # if the number of complete paths equal to beam size, it means the end to search
-                    if beam_size == len(score_complete):
-                        score_complete = torch.concat([s.unsqueeze(0) for s in score_complete])
-                        path_index = torch.argmax(score_complete).item()
-                        graph_probability_input = graph_probability_input_complete[path_index].unsqueeze(0)
-                        pred_prob = extract_pred_prob(graph_node[:1,:,:], graph_probability_input, node_mass, \
-                                                    dist, aa_mass_dict, device, model)
-                        graph_probability_input = graph_probability_input.cpu()
-                        break
+        path_label_print_tmp = ['/'.join([str(p) for p in ps]) for ps in label_path]
+        path_label_print = ' '.join(path_label_print_tmp)
+        matched_num_total += matched_num
+        predict_len_total += predict_len
+        label_len_total += label_len
+        
+        pred_prob = ' '.join([str(p) for p in pred_prob])
+        writer_path.writerow({'graph_idx': idx[0], 'pred_path': path_pred_print, 'pred_prob': pred_prob,\
+            'label_path': path_label_print, 'pred_seq':seq_predict})
 
-                    graph_probability_input_list = graph_probability_input_incomplete
-                    graph_probability_input_incomplete = []
-                    score_list = score_incomplete
-                    score_incomplete = []
-
-                    # all paths not complete continue to generate the distribution to choose next node of the path
-                    graph_probability_input_list = torch.stack(graph_probability_input_list, dim=0)
-                    decoder_input = generate_decoder_input(time_step, graph_probability_input_list, node_mass, dist, aa_mass_dict, device)
-                    graph_node = torch.stack(len(graph_probability_input_list) * [graph_node[0]], dim=0)
-                    graph_probability_list = generate_graph_probability(graph_probability_input_list, decoder_input, graph_node, model)
-
-            # Do evaluation on optimal path for each sample
-            matched_num, predict_len, label_len, pred_path, label_path = path_evaluation(graph_probability_input, label_path_distribution)
-            path_pred_print = ' '.join([str(p) for p in pred_path])
-            seq_predict = format_seq_predict(pred_path, node_mass, aa_datablock,
-                                            aa_datablock_dict_reverse, precursor_ion_mass)
-
-            path_label_print_tmp = ['/'.join([str(p) for p in ps]) for ps in label_path]
-            path_label_print = ' '.join(path_label_print_tmp)
-            matched_num_total += matched_num
-            predict_len_total += predict_len
-            label_len_total += label_len
-            
-            pred_prob = ' '.join([str(p) for p in pred_prob])
-            writer_path.writerow({'graph_idx': idx[0], 'pred_path': path_pred_print, 'pred_prob': pred_prob,\
-                'label_path': path_label_print, 'pred_seq':seq_predict})
-        except:
-            pass
 
     # Print the final evaluation
     print('matched_num_total: ', matched_num_total)
