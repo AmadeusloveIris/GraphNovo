@@ -61,13 +61,15 @@ class Task:
     def test_initialize(self, *, test_spec_header=None, test_dataset_dir=None):
         assert not self.distributed
         self.model = genova.models.Genova(self.cfg).to(self.device)
-        self.persistent_file_name = os.path.join(self.serialized_model_path,self.cfg.wandb.project+'.pt')
+        self.persistent_file_name = os.path.join(self.serialized_model_path,self.cfg.wandb.project+'_'+self.cfg.wandb.name+'.pt')
+        print('checkpoint: ', self.persistent_file_name)
         assert os.path.exists(self.persistent_file_name)
         if isinstance(self.cfg.infer.device, int):
             checkpoint = torch.load(self.persistent_file_name)
         else:
             checkpoint = torch.load(self.persistent_file_name,map_location='cpu')
-        self.model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.model.eval()
         self.test_dl = self.test_loader(test_spec_header,test_dataset_dir)
         self.test_spec_header = test_spec_header
 

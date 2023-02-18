@@ -52,8 +52,8 @@ def generate_next_token_prob(model, model_input, static_input):
 
 def seq_generation_infer(cfg: DictConfig, spec_header, test_dl, model, device):
     genova_dir = get_original_cwd()
-    optimum_path_result = pd.read_csv(genova_dir+cfg.infer.optimum_path_file, index_col="graph_idx")
-    optimum_path_result = optimum_path_result.drop(["label_path"], axis=1)
+    optimal_path_result = pd.read_csv(genova_dir+cfg.infer.optimal_path_file, index_col="graph_idx")
+    optimal_path_result = optimal_path_result.drop(["label_path"], axis=1)
 
     # dictionary
     aa_dict = {aa: i for i, aa in enumerate(Residual_seq.output_aalist(), start=3)}
@@ -72,36 +72,35 @@ def seq_generation_infer(cfg: DictConfig, spec_header, test_dl, model, device):
     aa_matched_num_total, aa_predict_len_total, aa_label_len_total = 0, 0, 0
     peptide_matched_num = 0
     gen_infer = GenerationInference(cfg, device, genova_dir, spec_header,\
-        optimum_path_result, model, aa_dict)
+        optimal_path_result, model, aa_dict)
     for i, (encoder_input, _, _, _, _, idx) in enumerate(test_dl):
         if i % 100 == 0 and i > 0:
             print('Num of Samples: ', i)
-        try:
-            if torch.is_tensor(idx): idx = idx.tolist()
+        if torch.is_tensor(idx): idx = idx.tolist()
 
-            seq_label, node_mass, path_mass, precursor_moverz,\
-                precursor_charge, edge_known_list = gen_infer.read_spec_data(idx)
-            seq_label_sep = seq_label
-            
-            with torch.no_grad():
-                encoder_input = gen_infer.input_cuda(encoder_input)
-                encoder_output = model.encoder(**encoder_input)
-            
-            pred_seq, pred_prob = gen_infer.inference_step([node_mass, path_mass, \
-                precursor_moverz, precursor_charge, edge_known_list], \
-                encoder_output, generate_next_token_prob, generate_model_input)
-            writer.writerow({'graph_idx': idx[0], 'pred_seq': pred_seq, 'pred_prob': pred_prob, \
-                            'pred_path':path_mass.tolist(), 'label_seq': seq_label_sep})
+        seq_label, node_mass, path_mass, precursor_moverz,\
+            precursor_charge, edge_known_list = gen_infer.read_spec_data(idx)
+        seq_label_sep = seq_label
+        
+        with torch.no_grad():
+            encoder_input = gen_infer.input_cuda(encoder_input)
+            encoder_output = model.encoder(**encoder_input)
+        
+        pred_seq, pred_prob = gen_infer.inference_step([node_mass, path_mass, \
+            precursor_moverz, precursor_charge, edge_known_list], \
+            encoder_output, generate_next_token_prob, generate_model_input)
 
-            aa_matched_num, aa_predict_len, aa_label_len = \
-                gen_infer.match_AA_novor(seq_label.replace(' ',''), pred_seq)
-            if aa_matched_num == aa_predict_len and aa_predict_len == aa_label_len:
-                peptide_matched_num += 1
-            aa_matched_num_total += aa_matched_num
-            aa_predict_len_total += aa_predict_len
-            aa_label_len_total += aa_label_len
-        except:
-            pass
+        writer.writerow({'graph_idx': idx[0], 'pred_seq': pred_seq, 'pred_prob': pred_prob, \
+                        'pred_path':path_mass.tolist(), 'label_seq': seq_label_sep})
+
+        aa_matched_num, aa_predict_len, aa_label_len = \
+            gen_infer.match_AA_novor(seq_label.replace(' ',''), pred_seq)
+        if aa_matched_num == aa_predict_len and aa_predict_len == aa_label_len:
+            peptide_matched_num += 1
+        aa_matched_num_total += aa_matched_num
+        aa_predict_len_total += aa_predict_len
+        aa_label_len_total += aa_label_len
+
 
     print('aa_matched_num_total:', aa_matched_num_total)
     print('aa_predict_len_total: ', aa_predict_len_total)
