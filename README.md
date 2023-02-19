@@ -22,8 +22,7 @@ Before your first time using, you need to set up wandb account. For details abou
 ### Train
 If you want to use constructed graph to train from scrach, you need to use following command: (we assume that you download data under GraphNovo file fold. If not, please adjust path by yourself.)
 ~~~
-python main.py train.serialized_model_path=save/ckpt dist=false task=optimal_path train_spec_header_path=training_dataset/preprocessed/training_dataset.csv eval_spec_header_path
-=validation_dataset/preprocessed/validation_dataset.csv train_dataset_dir=training_dataset/preprocessed/ eval_dataset_dir=validation_dataset/preprocessed/ wandb.project=GraphNovo wandb.name=PathSearcher
+python main.py serialized_model_path=save/ckpt dist=false task=optimal_path train_spec_header_path=training_dataset/preprocessed/training_dataset.csv eval_spec_header_path=validation_dataset/preprocessed/validation_dataset.csv train_dataset_dir=training_dataset/preprocessed/ eval_dataset_dir=validation_dataset/preprocessed/ wandb.project=GraphNovo wandb.name=PathSearcher
 ~~~
 For 'task' argument, you can choose 'optimal_path' or 'sequence_generation'. Use 'optimal_path' will train a GraphNovo_PathSearcher and 'sequence_generation' will train GraphNovo_SeqFiller
 

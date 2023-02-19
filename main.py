@@ -7,16 +7,12 @@ import torch.distributed as dist
 from hydra.utils import get_original_cwd
 from omegaconf import DictConfig, OmegaConf
 
-@hydra.main(config_path="configs", config_name="config")
+@hydra.main(version_base=None, config_path="configs", config_name="config")
 def main(cfg: DictConfig)->None:
-    
-    #需要修改为输入变量
     if cfg.mode == 'train':
-        assert cfg.train.serialized_model_path==None or cfg.train_spec_header_path==None \
-        or cfg.eval_spec_header_path==None or cfg.train_dataset_dir==None or cfg.eval_dataset_dir==None
         train_spec_header = pd.read_csv(cfg.train_spec_header_path,index_col='Spec Index')
         eval_spec_header = pd.read_csv(cfg.eval_spec_header_path,index_col='Spec Index')
-        task = genova.task.Task(cfg,serialized_model_path=cfg.train.serialized_model_path, distributed=cfg.dist)
+        task = genova.task.Task(cfg,serialized_model_path=cfg.serialized_model_path, distributed=cfg.dist)
         task.initialize(train_spec_header=train_spec_header,train_dataset_dir=cfg.train_dataset_dir,val_spec_header=eval_spec_header,val_dataset_dir=cfg.eval_dataset_dir)
         
         if dist.is_initialized() and dist.get_rank()!=0: pass

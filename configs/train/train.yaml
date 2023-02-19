@@ -1,5 +1,4 @@
 lr: 2e-4
-total_epoch: 10
+total_epoch: 5
 detect_period: 400
 eval_period: 4000
-serialized_model_path:
