@@ -1,3 +1,4 @@
+import os
 import sys
 import gzip
 import torch
@@ -16,16 +17,28 @@ for num in range(1,7):
         all_edge_mass.append(Residual_seq(i).mass)
 all_edge_mass = np.unique(np.array(all_edge_mass))
 
-psm_head = []
-for psm_file_name in glob('/data/z37mao/genova_new/*_PSMs.csv'):
-    psm_head_temp = pd.read_csv(psm_file_name)
-    psm_head_temp['File ID'] = psm_file_name.split('/')[-1][:-9]+':'+psm_head_temp['File ID']
-    psm_head.append(psm_head_temp)
-psm_head = pd.concat(psm_head)
-psm_head = psm_head.set_index('File ID')
-
 with open('candidate_mass','rb') as f:
     candidate_mass = pickle.load(f)
+
+def read_mgf(file_path):
+    raw_mgf_blocks = {}
+    for file in glob(os.path.join(file_path,'*mgf')):
+        with open(file) as f:
+            for line in f:
+                if line.startswith('BEGIN IONS'):
+                    product_ions_moverz = []
+                    product_ions_intensity = []
+                elif line.startswith('TITLE'):
+                    file_name = line.strip().split('=')[-1]
+                elif line[0].isnumeric():
+                    product_ion_moverz, product_ion_intensity = line.strip().split(' ')
+                    product_ions_moverz.append(float(product_ion_moverz))
+                    product_ions_intensity.append(int(float(product_ion_intensity)))
+                elif line.startswith('END IONS'):
+                    raw_mgf_blocks[file_name] = {'product_ions_moverz':np.array(product_ions_moverz),
+                                                 'product_ions_intensity':np.array(product_ions_intensity)}
+    return raw_mgf_blocks
+
 class PeakFeatureGeneration:
     def __init__(self, local_sliding_window, data_acquisition_upper_limit):
         self.local_sliding_window = local_sliding_window
@@ -290,29 +303,31 @@ class GraphGenerator:
 graph_gen = GraphGenerator(candidate_mass,all_edge_mass)
 
 if __name__=='__main__':
-    worker, start_i, end_i = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
+    worker, total_worker, file_path, csv_filename = int(sys.argv[1]), int(sys.argv[2]), sys.argv[3], sys.argv[4]
+    psm_head = pd.read_csv(os.path.join(file_path,f'{csv_filename}.csv'), index_col='Spec Index')
+    spectra_per_worker = int(len(psm_head)/total_worker)
+    start_i, end_i = spectra_per_worker*(worker-1), spectra_per_worker*worker
     psm_head = psm_head.iloc[start_i:end_i]
-    with open('/home/z37mao/genova_data/{}.csv'.format(worker), 'w') as index_writer:
-        index_writer.write('Spec Index,Node Number,Relation Num,Edge Num,MSGP File Name,MSGP Datablock Pointer,MSGP Datablock Length\n')
-        for i, (spec_index, (experiment_name, seq, precursor_charge, precursor_moverz, pointer, data_len)) in enumerate(psm_head[['MGFS Experiment Name','Annotated Sequence','Charge','m/z','MGFS_Datablock_Pointer','MGFS_Datablock_Length']].iterrows()):
+    all_spectra = read_mgf(file_path)
+    with open(os.path.join(file_path,f'{csv_filename}_{worker}.csv'), 'w') as index_writer:
+        index_writer.write('Spec Index,Annotated Sequence,Charge,m/z,Node Number,Relation Num,Edge Num,MSGP File Name,MSGP Datablock Pointer,MSGP Datablock Length\n')
+        for i, (spec_index, (seq, precursor_charge, precursor_moverz)) in enumerate(psm_head[['Annotated Sequence','Charge','m/z']].iterrows()):
             file_num = i//4000
             if i%4000==0:
                 try: writer.close()
                 except: pass 
-                writer = open('/home/z37mao/genova_data/{}_{}.msgp'.format(worker, file_num),'wb')
-            with open('/data/z37mao/genova_new/{}.mgfs'.format(experiment_name),'rb') as f:
-                f.seek(pointer)
-                seq = seq.replace('L','I')
-                product_ion_info = pickle.loads(f.read(data_len))
-                precursor_ion_mass = Ion.precursorion2mass(precursor_moverz, precursor_charge)
-                product_ions_moverz, product_ions_intensity = product_ion_info['product_ions_moverz'], product_ion_info['product_ions_intensity']
-                node_mass, node_input, rel_input, edge_input, graph_label = graph_gen(seq, product_ions_moverz, product_ions_intensity, precursor_ion_mass, precursor_charge>2)
-                record = {'node_mass':node_mass,
-                          'node_input':node_input, 
-                          'rel_input':rel_input, 
-                          'edge_input':edge_input, 
-                          'graph_label':graph_label}
-                compressed_data = gzip.compress(pickle.dumps(record))
-                index_writer.write('{},{},{},{},{},{},{}\n'.format(spec_index,node_mass.size,len(rel_input['rel_type']),len(edge_input['edge_type']),"{}_{}.msgp".format(worker, file_num),writer.tell(),len(compressed_data)))
-                writer.write(compressed_data)
+                writer = open(os.path.join(file_path,f'{csv_filename}_{worker}_{file_num}.msgp'),'wb')
+            seq = seq.replace('L','I').replace(' ','')
+            product_ion_info = all_spectra[spec_index]
+            precursor_ion_mass = Ion.precursorion2mass(precursor_moverz, precursor_charge)
+            product_ions_moverz, product_ions_intensity = product_ion_info['product_ions_moverz'], product_ion_info['product_ions_intensity']
+            node_mass, node_input, rel_input, edge_input, graph_label = graph_gen(seq, product_ions_moverz, product_ions_intensity, precursor_ion_mass, precursor_charge>2)
+            record = {'node_mass':node_mass,
+                      'node_input':node_input, 
+                      'rel_input':rel_input, 
+                      'edge_input':edge_input, 
+                      'graph_label':graph_label}
+            compressed_data = gzip.compress(pickle.dumps(record))
+            index_writer.write('{},{},{},{},{},{},{},{},{},{}\n'.format(spec_index,seq,precursor_charge,precursor_moverz,node_mass.size,len(rel_input['rel_type']),len(edge_input['edge_type']),"{}_{}_{}.msgp".format(csv_filename, worker, file_num),writer.tell(),len(compressed_data)))
+            writer.write(compressed_data)
                 

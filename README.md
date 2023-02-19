@@ -37,3 +37,10 @@ Persistent model are named as <wandb.project>_<wandb.name> So if you want to use
 ### Inference
 
 ### Graph Construction
+For graph construction, please prepare 50G memory per thread. If you want to construct the graph. Please remember to put csv file(psm header) and mgf file to same fold.
+~~~
+cd genova/utils
+sh parrllel_preprocessing.sh <total_threads> <data_path> <psm header name without 'csv'>
+~~~
+
+After all graph_constructor finished, constructed graph will be stored at same location as 'data_path', remember concat all generated csv file.
