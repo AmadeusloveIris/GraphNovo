@@ -8,7 +8,7 @@ defaults:
 
 mode: train
 dist: false
-task: optimal_path
+task:
 train_spec_header_path: 
 eval_spec_header_path:
 train_dataset_dir:
@@ -16,6 +16,6 @@ eval_dataset_dir:
 
 wandb:
   entity: graphnovo
-  project: graphnovo
-  name: pathsearcher
+  project: Graphnovo
+  name:
 

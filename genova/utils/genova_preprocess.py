@@ -294,7 +294,7 @@ if __name__=='__main__':
     psm_head = psm_head.iloc[start_i:end_i]
     with open('/home/z37mao/genova_data/{}.csv'.format(worker), 'w') as index_writer:
         index_writer.write('Spec Index,Node Number,Relation Num,Edge Num,MSGP File Name,MSGP Datablock Pointer,MSGP Datablock Length\n')
-        for i, (spec_index, (experiment_name, seq, precursor_charge, precursor_moverz, pointer, data_len)) in enumerate(psm_head[['MGFS Experiment Name','Annotated Sequence','Charge','m/z [Da]','MGFS_Datablock_Pointer','MGFS_Datablock_Length']].iterrows()):
+        for i, (spec_index, (experiment_name, seq, precursor_charge, precursor_moverz, pointer, data_len)) in enumerate(psm_head[['MGFS Experiment Name','Annotated Sequence','Charge','m/z','MGFS_Datablock_Pointer','MGFS_Datablock_Length']].iterrows()):
             file_num = i//4000
             if i%4000==0:
                 try: writer.close()

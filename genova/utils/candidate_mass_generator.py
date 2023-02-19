@@ -26,4 +26,4 @@ def all_possible_seqmz(max_mass, aalist_startindex):
 
 result_seqmz = all_possible_seqmz(1000,0)
 result_seqmz = np.sort(np.unique(np.round(np.array(result_seqmz),8)))[1:]
-pickle.dump(result_seqmz, open('candidate_mass_new','wb'))
+pickle.dump(result_seqmz, open('candidate_mass','wb'))
