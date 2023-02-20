@@ -8,11 +8,11 @@ from .knapsack import knapsack_mask
 from ..utils.BasicClass import Residual_seq, Ion, Composition
 
 class GenerationInference():
-    def __init__(self, cfg, device, genova_dir, spec_header, optimum_path_result, model, aa_id):
+    def __init__(self, cfg, device, graphnovo_dir, spec_header, optimum_path_result, model, aa_id):
         self.beam_size = cfg.infer.beam_size
         self.data_dir = cfg.infer.data_dir
         self.device = device
-        self.genova_dir = genova_dir
+        self.graphnovo_dir = graphnovo_dir
         self.spec_header = spec_header
         self.optimum_path_result = optimum_path_result
         self.aa_mass_dict = {aa: Residual_seq(aa).mass for aa in Residual_seq.output_aalist()}
@@ -20,14 +20,14 @@ class GenerationInference():
         self.id_aa = {aa_id[aa]:aa for aa in aa_id} 
         self.aa_known_list = ['A', 'D', 'c', 'E', 'G', 'H', 'I', 'M', 'P', 'S', 'T', 'Y', 'V']
         self.aa_mass_min = min(self.aa_mass_dict.values())
-        self.knapsack_matrix = np.load(self.genova_dir+'/save/knapsack/knapsack.npy')
+        self.knapsack_matrix = np.load(os.path.join(self.graphnovo_dir,cfg.serialized_model_path.split('/')[0],'knapsack/knapsack.npy'))
         self.model = model
 
     def read_spec_data(self, idx):
         spec_head = self.spec_header.loc[idx[0]]
         seq_label = spec_head['Annotated Sequence'].replace('L', 'I')
 
-        with open(os.path.join(self.genova_dir+self.data_dir, spec_head['MSGP File Name']), 'rb') as f:
+        with open(os.path.join(self.graphnovo_dir, self.data_dir, spec_head['MSGP File Name']), 'rb') as f:
             f.seek(spec_head['MSGP Datablock Pointer'])
             spec = pickle.loads(gzip.decompress(f.read(spec_head['MSGP Datablock Length'])))
             node_mass = spec['node_mass']

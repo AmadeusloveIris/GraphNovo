@@ -43,3 +43,23 @@ sh parrllel_preprocessing.sh <total_threads> <data_path> <psm header name withou
 ~~~
 
 After all graph_constructor finished, constructed graph will be stored at same location as 'data_path', remember concat all generated csv file.
+
+### PathSearcher
+Please make a directory of 'graphnovo_data' and 'prediction'. Download 'overall' or 'barrier' data under the directory 'graphnovo_data'. All prediction will be saved under 'prediction'. Testset can be 'A_Thaliana' for A. thaliana, 'C_Elegans' for C. elegans, or 'E_Coli' for E. coli.
+
+To generate optimal path of A. thaliana, please use:
+~~~
+python main.py mode=inference serialized_model_path=save/ckpt dist=false infer=optimal_path_inference task=optimal_path wandb.project=GraphNovo wandb.name=PathSearcher infer.beam_size=20 infer.testset=A_Thaliana infer.optimal_path_file=prediction/optimal_path/A_Thaliana_beam20_sum.csv infer.data_dir=graphnovo_data/overall
+~~~
+
+The predicted optimal path will be stored under './prediction/optimal_path'. wandb.project and wandb.name should be consistent with the training setting to use the correct checkpoint. 
+
+### SeqFiller
+To generate the final prediction of peptide sequence of A. thaliana, please use:
+~~~
+python main.py mode=inference serialized_model_path=save/ckpt dist=false infer=sequence_generation_inference task=sequence_generation wandb.project=GraphNovo wandb.name=SeqFiller infer.beam_size=20 infer.testset=A_Thaliana infer.optimal_path_file=prediction/optimal_path/A_Thaliana_beam20_sum.csv infer.output_file=prediction/sequence_generation/A_Thaliana_beam20_sum_beam20_sum.csv infer.data_dir=graphnovo_data/overall
+~~~
+
+The predicted peptide sequence is generated along the optimal path saved in 'prediction/optimal_path/A_Thaliana_beam20_sum.csv' for this example. The final result is saved under 'prediction/sequence_generation'. 
+
+

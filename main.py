@@ -1,5 +1,6 @@
 import hydra
 import wandb
+import os
 import genova
 import numpy as np
 import pandas as pd
@@ -58,15 +59,17 @@ def main(cfg: DictConfig)->None:
         elif cfg.infer.testset == 'E_Coli':
             preprocess_file = 'E_Coli.csv'
             
-        genova_dir = get_original_cwd()
-        print('genova_dir: ', genova_dir)
-        spec_header = pd.read_csv(genova_dir+cfg.infer.data_dir+preprocess_file, index_col='Spec Index')
+        graphnovo_dir = get_original_cwd()
+        print('graphnovo_dir: ', graphnovo_dir)
+        spec_header = pd.read_csv(os.path.join(graphnovo_dir,cfg.infer.data_dir,preprocess_file), index_col='Spec Index')
+        spec_header = spec_header[spec_header['Node Number'] < 200]
+        spec_header = spec_header[:200]
         print('Full dataset shape: ', spec_header.shape)
         print('MSGP File Name list: ', set(spec_header['MSGP File Name'].tolist()))
 
         # initialization
-        task = genova.task.Task(cfg,genova_dir+'/save', distributed=False)
-        task.test_initialize(test_spec_header=spec_header,test_dataset_dir=genova_dir+cfg.infer.data_dir)
+        task = genova.task.Task(cfg, os.path.join(graphnovo_dir,cfg.serialized_model_path), distributed=False)
+        task.test_initialize(test_spec_header=spec_header,test_dataset_dir=os.path.join(graphnovo_dir,cfg.infer.data_dir))
         task.inference()
 
 if __name__=='__main__':
