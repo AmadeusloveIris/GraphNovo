@@ -8,15 +8,15 @@ defaults:
 
 mode: train
 dist: false
-task:
-train_spec_header_path: 
-eval_spec_header_path:
-train_dataset_dir:
-eval_dataset_dir:
-serialized_model_path:
+task: optimal_path
+train_spec_header_path: None
+eval_spec_header_path: None
+train_dataset_dir: None
+eval_dataset_dir: None
+serialized_model_path: None
 
 wandb:
   entity: graphnovo
   project: Graphnovo
-  name:
+  name: pathsearcer
 

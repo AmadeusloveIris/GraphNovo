@@ -1,4 +1,5 @@
 import csv
+import os
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -51,8 +52,8 @@ def generate_next_token_prob(model, model_input, static_input):
     
 
 def seq_generation_infer(cfg: DictConfig, spec_header, test_dl, model, device):
-    genova_dir = get_original_cwd()
-    optimal_path_result = pd.read_csv(genova_dir+cfg.infer.optimal_path_file, index_col="graph_idx")
+    graphnovo_dir = get_original_cwd()
+    optimal_path_result = pd.read_csv(os.path.join(graphnovo_dir, cfg.infer.optimal_path_file), index_col="graph_idx")
     optimal_path_result = optimal_path_result.drop(["label_path"], axis=1)
 
     # dictionary
@@ -62,7 +63,8 @@ def seq_generation_infer(cfg: DictConfig, spec_header, test_dl, model, device):
     aa_dict['<eos>'] = 2
     
     # save result
-    filename = genova_dir+cfg.infer.output_file
+    print('graphnovo_dir:', graphnovo_dir)
+    filename = os.path.join(graphnovo_dir, cfg.infer.output_file)
     print("output file: ", filename)
     csvfile = open(filename, 'w', buffering=1)
     fieldnames = ['graph_idx', 'pred_seq', 'pred_prob', 'pred_path', 'label_seq']
@@ -71,7 +73,7 @@ def seq_generation_infer(cfg: DictConfig, spec_header, test_dl, model, device):
     
     aa_matched_num_total, aa_predict_len_total, aa_label_len_total = 0, 0, 0
     peptide_matched_num = 0
-    gen_infer = GenerationInference(cfg, device, genova_dir, spec_header,\
+    gen_infer = GenerationInference(cfg, device, graphnovo_dir, spec_header,\
         optimal_path_result, model, aa_dict)
     for i, (encoder_input, _, _, _, _, idx) in enumerate(test_dl):
         if i % 100 == 0 and i > 0:

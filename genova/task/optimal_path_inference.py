@@ -164,7 +164,7 @@ def format_seq_predict(predict_path, node_mass, aa_datablock, aa_datablock_dict_
     return seq_predict
     
 def optimal_path_infer(cfg:DictConfig, spec_header, test_dl, model, device):
-    genova_dir = get_original_cwd()
+    graphnovo_dir = get_original_cwd()
 
     # dictionary
     aa_datablock_dict, aa_datablock_dict_reverse = aa_datablock_dict_generate()
@@ -172,7 +172,9 @@ def optimal_path_infer(cfg:DictConfig, spec_header, test_dl, model, device):
     aa_mass_dict = {aa:Residual_seq(aa).mass for aa in Residual_seq.output_aalist()}
     
     # save result
-    path_file_name = genova_dir + cfg.infer.optimal_path_file
+    print('graphnovo_dir:', graphnovo_dir)
+    path_file_name = os.path.join(graphnovo_dir, cfg.infer.optimal_path_file)
+    print('path_file_name: ', path_file_name)
     path_csvfile = open(path_file_name, 'w', buffering=1)
     path_fieldnames = ['graph_idx', 'pred_path', 'pred_prob', 'label_path', 'pred_seq']
     writer_path = csv.DictWriter(path_csvfile, fieldnames=path_fieldnames, quoting=csv.QUOTE_NONNUMERIC)
@@ -188,7 +190,7 @@ def optimal_path_infer(cfg:DictConfig, spec_header, test_dl, model, device):
         if torch.is_tensor(idx): idx = idx.tolist()
         spec_head = spec_header.loc[idx[0]]
         
-        with open(os.path.join(genova_dir+cfg.infer.data_dir, spec_head['MSGP File Name']), 'rb') as f:
+        with open(os.path.join(graphnovo_dir, cfg.infer.data_dir, spec_head['MSGP File Name']), 'rb') as f:
             f.seek(spec_head['MSGP Datablock Pointer'])
             spec = pickle.loads(gzip.decompress(f.read(spec_head['MSGP Datablock Length'])))
             node_mass = spec['node_mass']
