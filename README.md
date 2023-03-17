@@ -9,6 +9,13 @@ Data repository: <https://drive.google.com/drive/folders/18KnMWPoTsMporY2N4ttECX
 ## Usage
 This project use hydra to manage configure file and use wandb to visiualize training step. If you are not familiar with them, please go to: <https://hydra.cc>(hydra) and <https://wandb.ai>(Weights & Biases)
 
+## Hardware Requirement
+For model training, we suggests utilizing an 80GB A100 GPU.
+
+For model inferencing, our tests have shown that a 16GB V100 GPU performs well.
+
+In case you plan to build a graph from scratch, ensure that you have access to a server with over 500GB of RAM.
+
 ### Setup
 For envrionment prepare, please use conda:
 ~~~
