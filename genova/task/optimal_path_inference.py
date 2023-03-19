@@ -291,5 +291,5 @@ def optimal_path_infer(cfg:DictConfig, spec_header, test_dl, model, device):
     print('matched_num_total: ', matched_num_total)
     print('predict_len_total: ', predict_len_total)
     print('label_len_total: ', label_len_total)
-    print('path precision: ', matched_num_total / predict_len_total)
-    print('path recall: ', matched_num_total / label_len_total)
+    print('node precision: ', matched_num_total / predict_len_total)
+    print('node recall: ', matched_num_total / label_len_total)
