@@ -12,11 +12,11 @@ This project use hydra to manage configure file and use wandb to visiualize trai
 ## Hardware Requirement
 For model training, we suggests utilizing an 80GB A100 GPU.
 
-For model inferencing, our tests have shown that a 16GB V100 GPU performs well.
+For model inferencing, our tests have shown that most spectra perform well under 16GB V100 GPU. However if the size of spectrum is too large, we recommend using a GPU with higher memory capacity or performing inferencing on a CPU instead.
 
 In case you plan to build a graph from scratch, ensure that you have access to a server with over 500GB of RAM.
 
-### Setup
+## Setup
 For envrionment prepare, please use conda:
 ~~~
 conda env create -f environment.yml
