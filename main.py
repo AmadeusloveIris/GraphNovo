@@ -62,8 +62,6 @@ def main(cfg: DictConfig)->None:
         graphnovo_dir = get_original_cwd()
         print('graphnovo_dir: ', graphnovo_dir)
         spec_header = pd.read_csv(os.path.join(graphnovo_dir,cfg.infer.data_dir,preprocess_file), index_col='Spec Index')
-        spec_header = spec_header[spec_header['Node Number'] < 200]
-        spec_header = spec_header[:200]
         print('Full dataset shape: ', spec_header.shape)
         print('MSGP File Name list: ', set(spec_header['MSGP File Name'].tolist()))
 
