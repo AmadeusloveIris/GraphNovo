@@ -7,16 +7,16 @@ Author: Zeping Mao(z37mao@uwaterloo.ca), Ruixue Zhang(r267zhan@uwaterloo.ca)
 Data repository: <https://drive.google.com/drive/folders/18KnMWPoTsMporY2N4ttECXzi5V--NSZx?usp=sharing>
 
 ## Usage
-This project use hydra to manage configure file and use wandb to visiualize training step. If you are not familiar with them, please go to: <https://hydra.cc>(hydra) and <https://wandb.ai>(Weights & Biases)
+This project uses hydra to manage configure file and use wandb to visiualize training step. If you are not familiar with them, please go to: <https://hydra.cc>(hydra) and <https://wandb.ai>(Weights & Biases).
 
-## Hardware Requirement
+### Hardware Requirement
 For model training, we suggests utilizing an 80GB A100 GPU.
 
-For model inferencing, our tests have shown that most spectra perform well under 16GB V100 GPU. However if the size of spectrum is too large, we recommend using a GPU with higher memory capacity or performing inferencing on a CPU instead.
+For model inferencing, our tests have shown that most spectra perform well under 16GB V100 GPU. However if the size of spectrum is too large, we recommend using a GPU with higher memory or performing inferencing on a CPU with enough RAM instead.
 
 In case you plan to build a graph from scratch, ensure that you have access to a server with over 500GB of RAM.
 
-## Setup
+### Setup
 For envrionment prepare, please use conda:
 ~~~
 conda env create -f environment.yml
@@ -36,19 +36,19 @@ If you want to use constructed graph to train from scrach, you need to use follo
 ~~~
 python main.py serialized_model_path=save/ckpt dist=false task=optimal_path train_spec_header_path=training_dataset/preprocessed/training_dataset.csv eval_spec_header_path=validation_dataset/preprocessed/validation_dataset.csv train_dataset_dir=training_dataset/preprocessed/ eval_dataset_dir=validation_dataset/preprocessed/ wandb.project=GraphNovo wandb.name=PathSearcher
 ~~~
-For 'task' argument, you can choose 'optimal_path' or 'sequence_generation'. Use 'optimal_path' will train a GraphNovo_PathSearcher and 'sequence_generation' will train GraphNovo_SeqFiller
+For 'task' argument, you can choose 'optimal_path' or 'sequence_generation'. Use 'optimal_path' will train a GraphNovo_PathSearcher and 'sequence_generation' will train GraphNovo_SeqFiller.
 
-By the way, if you want to training model on multiple GPUs, Please use:
+By the way, if you want to train model on multiple GPUs. Please use:
 ~~~
 torchrun --<other arguments for torchrun> main.py <some path> dist=True <other argument>
 ~~~
 
-Persistent model are named as <wandb.project>_<wandb.name> So if you want to use anathor name, please remember to change these arguments.
+Persistent model is named as <wandb.project>_<wandb.name>. If you want to use anathor name, please remember to change these arguments.
 
 ------
 ### Inference
 #### PathSearcher
-Please make a directory of 'graphnovo_data' and 'prediction'. Download 'overall' or 'barrier' data under the directory 'graphnovo_data'. All prediction will be saved under 'prediction'. Testset can be 'A_Thaliana' for A. thaliana, 'C_Elegans' for C. elegans, or 'E_Coli' for E. coli.
+Please make a directory of 'graphnovo_data' and 'prediction'. Download 'overall' or 'barrier' data under the directory 'graphnovo_data'. All prediction will be saved under 'prediction'. Test set can be 'A_Thaliana' for A. thaliana, 'C_Elegans' for C. elegans, or 'E_Coli' for E. coli.
 
 To generate optimal path of A. thaliana, please use:
 ~~~
@@ -67,12 +67,12 @@ The predicted peptide sequence is generated along the optimal path saved in 'pre
 
 ------
 ### Graph Construction
-For graph construction, please prepare 50G memory per thread. If you want to construct the graph. Please remember to put csv file(psm header) and mgf file to same fold.
+For graph construction, please prepare 50G memory per thread. If you want to construct the graph, please remember to put csv file(psm header) and mgf file to the same folder.
 ~~~
 cd genova/utils
 sh parrllel_preprocessing.sh <total_threads> <data_path> <psm header name without 'csv'>
 ~~~
 
-After all graph_constructor finished, constructed graph will be stored at same location as 'data_path', remember concat all generated csv file.
+After all graph_constructor finished, constructed graph will be stored at same location as 'data_path'. Remember to concat all generated csv files.
 
 
