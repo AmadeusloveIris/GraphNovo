@@ -36,7 +36,7 @@ def main(cfg: DictConfig)->None:
                 elif (dist.is_initialized() and dist.get_rank()==0) or (not dist.is_initialized()):
                     print('step: {}, train_loss: {}'.format(total_step,loss_train)) 
                     wandb.log({'train_loss':loss_train}, step=total_step)
-            run.finish()
+            if (not dist.is_initialized()) or (dist.get_rank()==0): run.finish()
         else:
             for loss_train, total_step, epoch in task.train():
                 if total_step%cfg.train.eval_period==0:
@@ -50,10 +50,10 @@ def main(cfg: DictConfig)->None:
                 elif (dist.is_initialized() and dist.get_rank()==0) or (not dist.is_initialized()): 
                     print('step: {}, train_loss: {}'.format(total_step,loss_train))
                     wandb.log({'train_loss':loss_train}, step=total_step)
-            run.finish()
+            if (not dist.is_initialized()) or (dist.get_rank()==0): run.finish()
     elif cfg.mode == 'inference':
         if cfg.infer.testset == 'C_Elegans':
-            preprocess_file = 'C_Elegan.csv'
+            preprocess_file = 'C_Elegans.csv'
         elif cfg.infer.testset == 'A_Thaliana':
             preprocess_file = 'A_Thaliana.csv'
         elif cfg.infer.testset == 'E_Coli':
