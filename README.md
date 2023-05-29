@@ -71,7 +71,7 @@ WARNING: <idx> ran out of memory. Please run it on device with enough memory
 ~~~
 This alert suggests that the spectrum identified by \<idx\> is too extensive to fit into the device memory. Essentially, you are required to carry out the inference on a device that possesses adequate memory. Typically, this would mean using a CPU with a memory capacity of 150 Gb or a GPU with 80 Gb memory.
 
-For reprocessing those spectra, the simplest method involves executing the same command with a specific device name. For example:
+For reprocessing those spectra, the simplest method involves executing the same command with a specific device name. The rest of the spectra will automatically be appended to the output file. For example:
 
 ~~~
 python main.py <same argument> infer.device='cpu'
