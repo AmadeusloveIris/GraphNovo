@@ -66,10 +66,15 @@ def seq_generation_infer(cfg: DictConfig, spec_header, test_dl, model, device):
     print('graphnovo_dir:', graphnovo_dir)
     filename = os.path.join(graphnovo_dir, cfg.infer.output_file)
     print("output file: ", filename)
-    csvfile = open(filename, 'w', buffering=1)
-    fieldnames = ['graph_idx', 'pred_seq', 'pred_prob', 'pred_path', 'label_seq']
-    writer = csv.DictWriter(csvfile, fieldnames=fieldnames, quoting=csv.QUOTE_NONNUMERIC)
-    writer.writeheader()
+    if os.path.isfile(cfg.infer.output_file):
+        csvfile = open(filename, 'a', buffering=1)
+        fieldnames = ['graph_idx', 'pred_seq', 'pred_prob', 'pred_path', 'label_seq']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames, quoting=csv.QUOTE_NONNUMERIC)
+    else:
+        csvfile = open(filename, 'w', buffering=1)
+        fieldnames = ['graph_idx', 'pred_seq', 'pred_prob', 'pred_path', 'label_seq']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames, quoting=csv.QUOTE_NONNUMERIC)
+        writer.writeheader()
     
     aa_matched_num_total, aa_predict_len_total, aa_label_len_total = 0, 0, 0
     peptide_matched_num = 0
@@ -84,17 +89,22 @@ def seq_generation_infer(cfg: DictConfig, spec_header, test_dl, model, device):
             precursor_charge, edge_known_list = gen_infer.read_spec_data(idx)
         seq_label_sep = seq_label
         
-        with torch.no_grad():
-            encoder_input = gen_infer.input_cuda(encoder_input)
-            encoder_output = model.encoder(**encoder_input)
-        
-        pred_seq, pred_prob = gen_infer.inference_step([node_mass, path_mass, \
-            precursor_moverz, precursor_charge, edge_known_list], \
-            encoder_output, generate_next_token_prob, generate_model_input)
+        try:
+            with torch.no_grad():
+                encoder_input = gen_infer.input_cuda(encoder_input)
+                encoder_output = model.encoder(**encoder_input)
+            
+            pred_seq, pred_prob = gen_infer.inference_step([node_mass, path_mass, \
+                precursor_moverz, precursor_charge, edge_known_list], \
+                encoder_output, generate_next_token_prob, generate_model_input)
 
-        writer.writerow({'graph_idx': idx[0], 'pred_seq': pred_seq, 'pred_prob': pred_prob, \
-                        'pred_path':path_mass.tolist(), 'label_seq': seq_label_sep})
-
+            writer.writerow({'graph_idx': idx[0], 'pred_seq': pred_seq, 'pred_prob': pred_prob, \
+                            'pred_path':path_mass.tolist(), 'label_seq': seq_label_sep})
+        except RuntimeError as e:
+            if 'out of memory' in str(e): print(f'WARNING: {idx[0]} ran out of memory. Please run it on device with enough memory')
+            pred_seq = ''
+            pred_prob = ''
+            
         aa_matched_num, aa_predict_len, aa_label_len = \
             gen_infer.match_AA_novor(seq_label.replace(' ',''), pred_seq)
         if aa_matched_num == aa_predict_len and aa_predict_len == aa_label_len:

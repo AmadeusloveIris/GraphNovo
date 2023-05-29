@@ -1,5 +1,5 @@
 beam_size: 20
 testset: 'A_Thaliana'
-optimal_path_file: 'prediction/optimal_path/A_Thaliana_beam20_sum.csv'
+output_file: 'prediction/optimal_path/A_Thaliana_beam20_sum.csv'
 data_dir: 'graphnovo_data/overall'
-device: '0'
+device: 0

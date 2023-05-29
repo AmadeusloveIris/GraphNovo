@@ -52,7 +52,7 @@ Please make a directory of 'graphnovo_data' and 'prediction'. Download 'overall'
 
 To generate optimal path of A. thaliana, please use:
 ~~~
-python main.py mode=inference serialized_model_path=save/ckpt dist=false infer=optimal_path_inference task=optimal_path wandb.project=GraphNovo wandb.name=PathSearcher infer.beam_size=20 infer.testset=A_Thaliana infer.optimal_path_file=prediction/optimal_path/A_Thaliana_beam20_sum.csv infer.data_dir=graphnovo_data/overall
+python main.py mode=inference serialized_model_path=save/ckpt dist=false infer=optimal_path_inference task=optimal_path wandb.project=GraphNovo wandb.name=PathSearcher infer.beam_size=20 infer.testset=A_Thaliana infer.output_file=prediction/optimal_path/A_Thaliana_beam20_sum.csv infer.data_dir=graphnovo_data/overall
 ~~~
 
 The predicted optimal path will be stored under './prediction/optimal_path'. wandb.project and wandb.name should be consistent with the training setting to use the correct checkpoint. 
@@ -64,6 +64,18 @@ python main.py mode=inference serialized_model_path=save/ckpt dist=false infer=s
 ~~~
 
 The predicted peptide sequence is generated along the optimal path saved in 'prediction/optimal_path/A_Thaliana_beam20_sum.csv' for this example. The final result is saved under 'prediction/sequence_generation'. 
+#### Out Of Memory Warning
+During the inference process, you might encounter warnings such as:
+~~~
+WARNING: <idx> ran out of memory. Please run it on device with enough memory
+~~~
+This alert suggests that the spectrum identified by \<idx\> is too extensive to fit into the device memory. Essentially, you are required to carry out the inference on a device that possesses adequate memory. Typically, this would mean using a CPU with a memory capacity of 150 Gb or a GPU with 80 Gb memory.
+
+For reprocessing those spectra, the simplest method involves executing the same command with a specific device name. For example:
+
+~~~
+python main.py <same argument> infer.device='cpu'
+~~~
 
 ------
 ### Graph Construction
