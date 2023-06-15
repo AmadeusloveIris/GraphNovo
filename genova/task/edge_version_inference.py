@@ -277,6 +277,6 @@ class GenerationInference():
                 edge_index += 1
             else:
                 pred_prob.append(t[pred_seq_id[t_idx]].item())
-                if Residual_seq(pred_seq[:(t_idx+1)]).mass > path_mass[edge_index] - (0.02+5*10e-6*node_mass[-1]):
+                if Residual_seq(pred_seq[:(t_idx+1)]).mass > path_mass[edge_index] - (0.02+5*1e-6*node_mass[-1]):
                     edge_index += 1
         return pred_prob
