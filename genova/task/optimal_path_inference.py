@@ -10,11 +10,14 @@ from omegaconf import DictConfig
 from .infer_utils import aa_datablock_dict_generate, input_cuda
 from ..utils.BasicClass import Residual_seq, Ion
 
+MS1_TOL = 5 # ppm
+MS2_TOL = 0.02
+
 def trans_mask_generate(node_mass, graph_label, dist, aa_mass_dict):
     """ For single sample """
     node_num = node_mass.size
     edge_mask = torch.zeros(node_num,node_num,dtype=bool)
-    for x,y in enumerate(node_mass.searchsorted(node_mass+min(aa_mass_dict.values())*7+0.04)):
+    for x,y in enumerate(node_mass.searchsorted(node_mass+min(aa_mass_dict.values())*7+2*MS2_TOL)):
         edge_mask[x,y:] = True
     edge_mask = torch.logical_or(edge_mask,dist!=0)
     trans_mask=((graph_label@edge_mask.int())!=0).bool()
@@ -143,7 +146,7 @@ def format_seq_predict(predict_path, node_mass, aa_datablock, aa_datablock_dict_
     edge_mass_list = [path_mass[i + 1] - path_mass[i] for i in range(len(path_mass) - 1)]
 
     for edge_mass in edge_mass_list:
-        mass_threshold = 2*0.02+5*precursor_ion_mass*1e-6
+        mass_threshold = 2*MS2_TOL+MS1_TOL*precursor_ion_mass*1e-6
         # mass_diff-mass_threshold <= aa_l <= edge_mass+mass_threshold <= aa_r
         l = aa_datablock.searchsorted(edge_mass - mass_threshold, side='left')
         r = aa_datablock.searchsorted(edge_mass + mass_threshold, side='left')

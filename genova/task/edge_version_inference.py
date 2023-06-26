@@ -7,6 +7,9 @@ import numpy as np
 from .knapsack import knapsack_mask
 from ..utils.BasicClass import Residual_seq, Ion, Composition
 
+MS1_TOL = 5 # ppm
+MS2_TOL = 0.02
+
 class GenerationInference():
     def __init__(self, cfg, device, graphnovo_dir, spec_header, optimum_path_result, model, aa_id):
         self.beam_size = cfg.infer.beam_size
@@ -119,7 +122,7 @@ class GenerationInference():
         aa_type_num = tgt_list[0].shape[0]
         total_single_aa_candidate = 0
 
-        error_tolerance = 200 + round(5e-2 * path_mass[-1])
+        error_tolerance = round(10000*MS2_TOL + MS1_TOL*1e-2*path_mass[-1]) 
         while total_single_aa_candidate == 0:
             score_list_extend = []
             score_list_extend_concat = []
@@ -145,7 +148,7 @@ class GenerationInference():
                 # score_list_extend_concat.append(score_sum / (len(pred_seq_list[t_idx]) + 1))  # extend another token
                 total_single_aa_candidate += len(single_aa_candidate)
             total_single_aa_candidate += len(score_complete)
-            error_tolerance += 200 # this is for the exception that there is no candidate
+            error_tolerance += 10000*MS2_TOL # this is for the exception that there is no candidate
         for s in score_complete:
             score_list_extend_concat.append(s.unsqueeze(0))
 
@@ -201,7 +204,7 @@ class GenerationInference():
             pred_seq = pred_seq_list_complete[seq_index]
             theo = (Residual_seq(pred_seq).mass + Composition('H2O').mass + precursor_charge * Composition(
                 'H').mass) / precursor_charge
-            if abs(theo - precursor_moverz) < 7 * 1e-6 * theo:
+            if abs(theo - precursor_moverz) < MS1_TOL * 1e-6 * theo:
                 mass_equal_flag = True
                 break
         if not mass_equal_flag:
@@ -219,11 +222,11 @@ class GenerationInference():
         for seq_index in seq_index_sort:
             pred_seq = pred_seq_list_complete[seq_index]
             theo = Residual_seq(pred_seq).mass
-            if abs(theo - target_mass) < 200 + round(7e-2 * target_mass):
-                new_score_complete.append(score_complete[seq_index])
-                new_pred_seq_list_complete.append(pred_seq)
-                if len(new_score_complete) == self.beam_size:
-                    break
+            # if abs(theo - target_mass) < (MS2_TOL + MS1_TOL*1e-6 * precursor_ion_mass):
+            new_score_complete.append(score_complete[seq_index])
+            new_pred_seq_list_complete.append(pred_seq)
+            if len(new_score_complete) == self.beam_size:
+                break
         return new_score_complete, new_pred_seq_list_complete
 
     def input_cuda(self, input):
@@ -277,6 +280,6 @@ class GenerationInference():
                 edge_index += 1
             else:
                 pred_prob.append(t[pred_seq_id[t_idx]].item())
-                if Residual_seq(pred_seq[:(t_idx+1)]).mass > path_mass[edge_index] - (0.02+5*1e-6*node_mass[-1]):
+                if Residual_seq(pred_seq[:(t_idx+1)]).mass > path_mass[edge_index] - (MS2_TOL+MS1_TOL*1e-6*node_mass[-1]):
                     edge_index += 1
         return pred_prob

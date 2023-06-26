@@ -9,6 +9,9 @@ from omegaconf import DictConfig
 from .edge_version_inference import GenerationInference
 from ..utils.BasicClass import Residual_seq
 
+MS1_TOL = 5 # ppm
+MS2_TOL = 0.02
+
 def generate_model_input(pred_seq_list, node_mass, aa_id, aa_mass_dict, input_cuda):
     tgt_input = {}
     for pred_seq in pred_seq_list:
@@ -34,7 +37,7 @@ def trans_mask_generate(seq, node_mass, aa_mass_dict):
     seq_mass = np.array([0]+[aa_mass_dict[aa] for aa in seq]).cumsum()
     trans_mask = torch.zeros((seq_mass.size,node_mass.size))
     trans_mask[0,0] = -float('inf')
-    for i, board in enumerate(node_mass.searchsorted(seq_mass+min(aa_mass_dict.values())-0.02),start=0):
+    for i, board in enumerate(node_mass.searchsorted(seq_mass+min(aa_mass_dict.values())-MS2_TOL),start=0):
         trans_mask[i,:board] = -float('inf')
     trans_mask[i, -1] = 0. 
     return trans_mask
