@@ -135,13 +135,24 @@ class GraphGenerator:
         self.c_term_ion_list = ['1y','1y-NH3','1y-H2O','2y','2y-NH3','2y-H2O']
         
     def __call__(self, seq, product_ions_moverz, product_ions_intensity, precursor_ion_mass, muti_charged):
+        #Please Read GraphNovo Paper Fig1b Step1
         peak_feature = self.peak_feature_generation(product_ions_moverz, product_ions_intensity)
+
+        #Please Read GraphNovo Paper Fig1b Step2
         subnode_mass, subnode_feature = self.candidate_subgraph_generator(precursor_ion_mass, product_ions_moverz, peak_feature)
+        
+        #Please Read GraphNovo Paper Fig1b Step3
         node_mass = self.graphnode_mass_generator(precursor_ion_mass, product_ions_moverz, muti_charged)
         #assert node_mass.size<=512
+
+        #Please Read GraphNovo Paper Fig1b Step4
         node_feat, node_sourceion = self.graphnode_feature_generator(node_mass, subnode_mass, subnode_feature, precursor_ion_mass)
+
+        #Please Read GraphNovo Paper Fig1b Step5
         subedge_maxnum, edge_type, edge_error = self.edge_generator(node_mass,precursor_ion_mass)
         rel_type, rel_error, dist, rel_pos, rel_coor = self.multihop_rel_generator(subedge_maxnum, edge_type, edge_error)
+
+        #Lable optimul path generation.
         graph_label = self.graph_label_generator(seq, node_mass, precursor_ion_mass)
         mask = edge_type>0
         edge_type = edge_type[mask].reshape((-1,1))
